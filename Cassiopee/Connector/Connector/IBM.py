@@ -1588,15 +1588,18 @@ def _blankByIBCBodies(t, tb, loc, dim, cellNName='cellN'):
     if blankalgo == 'xray' or DIM == 2:
         BM = numpy.ones((nbases,nbodies),dtype=Internal.E_NpyInt)
         dh_min = G_IBM_Height.getMinimumCartesianSpacing(t)
-        XRAYDIM1 = 2000; XRAYDIM2 = XRAYDIM1
+	## Modified this temporarily due to an issues encountered with the
+	## 2D MEA test case. We need a lot more XRAYs to capture the points
+	## if not it sets the target points inside the body at very particular 
+## locations in the leading edge of the main wing and in the slat
+        XRAYDIM1 = 2000*10000; XRAYDIM2 = XRAYDIM1
         if dh_min > 0.:
             bb = G.bbox(tb)
             Lxref = bb[3]-bb[0]
             Lyref = bb[4]-bb[1]
             XRAYDIM1 = max(XRAYDIM1,int(Lxref/(0.15*dh_min)))
             XRAYDIM2 = max(XRAYDIM2,int(Lyref/(0.15*dh_min)))
-        if DIM == 2: XRAYDIM2 = 2
-
+        #if DIM == 2: XRAYDIM2 = 2
         if loc == 'centers':
             tc = C.node2Center(t)
             for body in bodiesInv:

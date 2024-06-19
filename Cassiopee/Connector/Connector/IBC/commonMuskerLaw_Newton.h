@@ -12,17 +12,31 @@ while (err == 0 && count < 50)
     {
       skip = 0; 
       //fp
+      if (wl_ibm_swtch==1 || wl_ibm_swtch==11 || wl_ibm_swtch==31)
+	{
 # include "IBC/muskerprime_vec.h"
+	}
+      else if (wl_ibm_swtch==2 || wl_ibm_swtch==12 || wl_ibm_swtch==32)
+	{
+# include "IBC/SAWLprime_vec.h"
+	}
       if (K_FUNC::E_abs(fp) >= newtonepsprime) 
-      { 
-        utau_vec[noind] = K_FUNC::E_abs(utau_vec[noind]-utauv_vec[noind]/fp); 
-      }
+	{ 
+	  utau_vec[noind] = K_FUNC::E_abs(utau_vec[noind]-utauv_vec[noind]/fp); 
+	}
       else
-      {
-        skip = 1; 
-      } 
+	{
+	  skip = 1; 
+	} 
       
+      if (wl_ibm_swtch==1 || wl_ibm_swtch==11 || wl_ibm_swtch==31)
+	{
 # include "IBC/musker_vec.h"
+	}
+      else if (wl_ibm_swtch==2 || wl_ibm_swtch==12 || wl_ibm_swtch==32)
+	{
+# include "IBC/SAWL_vec.h"
+	}
     }
   }//loop point
   count++;

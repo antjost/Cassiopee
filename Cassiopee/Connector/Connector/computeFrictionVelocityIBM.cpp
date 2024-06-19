@@ -107,6 +107,20 @@ PyObject* K_CONNECTOR::_computeFrictionVelocityIBM(PyObject* self, PyObject* arg
     FldArrayF aa_vec(npts), uext_vec(npts), nutcible_vec(npts);
     FldArrayF ut_vec(npts), vt_vec(npts), wt_vec(npts), mu_vec(npts), alpha_vec(npts), utauv_vec(npts);
 
+    E_Int wl_ibm_swtch = 1; //currently hard coded for Musker only
+    E_Float BbarSA_WL  = 5.03339088;
+    E_Float a1SA_WL    = 8.14822158;
+    E_Float a2SA_WL    = -6.92870938;
+    E_Float b1SA_WL    = 7.46008761;
+    E_Float b2SA_WL    = 7.46814579;
+    E_Float c1SA_WL    = 2.54967735;
+    E_Float c2SA_WL    = 1.33016516;
+    E_Float c3SA_WL    = 3.59945911;
+    E_Float c4SA_WL    = 3.63975319;
+    
+    E_Float prt1SAWL_prime,prt2SAWL_prime,prt3SAWL_prime,prt4SAWL_prime;
+
+
       for (E_Int noind = 0; noind < npts; noind++)
        {
         roext = densPtr[noind];   // Densite du point interpole.

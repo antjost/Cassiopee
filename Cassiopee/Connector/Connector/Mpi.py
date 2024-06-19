@@ -369,7 +369,12 @@ def __setInterpTransfers(zones, zonesD, vars, dtloc, param_int, param_real, type
     motionType = int(Internal.getNodeFromName(zones,"Parameter_real")[1][64])
     motionType = Cmpi.allreduce(motionType, op=Cmpi.MAX)
     if motionType==3: isIbmMoving_int=1
-	
+
+    ## WMLES - Kawai & Tamaki 2021 
+    isWMLESLin = False
+    if int(Internal.getNodeFromName(zones,"Parameter_real")[1][57])>30:
+        isWMLESLin    =True
+    
     # Transferts locaux/globaux
     # Calcul des solutions interpolees par arbre donneur
     # On envoie aussi les indices receveurs pour l'instant
@@ -385,13 +390,13 @@ def __setInterpTransfers(zones, zonesD, vars, dtloc, param_int, param_real, type
         if dest == Cmpi.rank: #transfert intra_processus
             connector.___setInterpTransfers(zones, zonesD, vars, dtloc, param_int, param_real, it_target, varType,
                                             type_transfert, no_transfert, nstep, nitmax, rk, exploc, num_passage,
-                                            isWireModel_intv2)
+                                            isWireModel_intv2,int(isWMLESLin))
 
         else:
             rank  = Cmpi.rank
             infos = connector.__setInterpTransfersD(zones, zonesD, vars, dtloc, param_int, param_real, it_target, varType,
                                                     type_transfert, no_transfert, nstep, nitmax, rk, exploc, num_passage, rank,
-	    					    isWireModel_int,isIbmMoving_int) 
+	    					    isWireModel_int, isIbmMoving_int,int(isWMLESLin)) 
             if infos != []:
                for n in infos:
                   rcvNode = dest
@@ -436,7 +441,9 @@ def __setInterpTransfers(zones, zonesD, vars, dtloc, param_int, param_real, type
                 z = zones[rcvName]
                 C._setPartialFields(z, [field], [listIndices], loc='centers')
 
-
+    ## WMLES - Kawai & Tamaki 2021
+    if isWMLESLin and type_transfert==1:
+        __setInterpTransfers_WMLESLin(zones, zonesD, procDict=procDict,graphIBCD=graph)
     return None
 
 #===============================================================================
@@ -1025,12 +1032,13 @@ def __setInterpTransfers_WireModel(zones, zonesD, vars, dtloc, param_int, param_
 
     rcvDatas = Cmpi.sendRecv(datas, graphIBCD)
     datas    = {}
+    WMvsWMLESLin = 1 #Hard coded - flags for WM_getVal2tc & WM_setVal2tc
     for dest in rcvDatas:
         for [name, zname, ListDonor, ListRcv, dens_wm, velx_wm, vely_wm, velz_wm, temp_wm, sanu_wm] in rcvDatas[dest]:
             zr = znr[zname]
             connector._WM_getVal2tc(zr, variablesIBC, ListRcv,  
                                     dens_wm, velx_wm, vely_wm, velz_wm, temp_wm, sanu_wm,
-                                    1, nvars,
+                                    1, nvars,WMvsWMLESLin,
                                     Internal.__GridCoordinates__,
                                     Internal.__FlowSolutionNodes__,
                                     Internal.__FlowSolutionCenters__)
@@ -1058,4 +1066,55 @@ def __setInterpTransfers_WireModel(zones, zonesD, vars, dtloc, param_int, param_
                             sanu_wm    = Internal.getNodeFromName1(s, 'TurbulentSANuTilde_WM')[1]
                             connector._WM_setVal2tc(dens_wm_new, velx_wm_new, vely_wm_new, velz_wm_new, temp_wm_new, sanu_wm_new,
                                                     dens_wm    , velx_wm    , vely_wm    , velz_wm    , temp_wm    , sanu_wm    )
+    return None
+
+
+def __setInterpTransfers_WMLESLin(zones, zonesD, procDict=None,graphIBCD=None):
+
+    variablesIBC=['t11_model', 't12_model', 't22_model', 't13_model', 't23_model', 't33_model']
+    nvars        = 6 #Hard coded - flags for WM_getVal2tc & WM_setVal2tc
+    WMvsWMLESLin = 2 #Hard coded - flags for WM_getVal2tc & WM_setVal2tc
+    
+    # Transferts locaux/globaux
+    # Calcul des solutions interpolees par arbre donneur
+    # On envoie aussi les indices receveurs pour l'instant
+    datas = {}
+    datasGradP = {}
+
+    datas = {}
+    znr   = {}
+    for z in zones: znr[z[0]] = z
+    
+    for zd in zonesD:
+        subRegions = Internal.getNodesFromType1(zd, 'ZoneSubRegion_t')
+        for s in subRegions:            
+            sname = s[0].split('_')[1]
+            zname = s[0].split('_')[-1]
+            dest = procDict[zname]
+            if sname == '33' and dest != Cmpi.rank:
+                ListDonor  = numpy.copy(Internal.getNodeFromName1(s, 'PointList')[1])
+                ListRcv    = numpy.copy(Internal.getNodeFromName1(s, 'PointListDonor')[1])
+                t11m       = numpy.copy(Internal.getNodeFromName1(s, 't11_model')[1])
+                t12m       = numpy.copy(Internal.getNodeFromName1(s, 't12_model')[1])
+                t22m       = numpy.copy(Internal.getNodeFromName1(s, 't22_model')[1])
+                t13m       = numpy.copy(Internal.getNodeFromName1(s, 't13_model')[1])
+                t23m       = numpy.copy(Internal.getNodeFromName1(s, 't23_model')[1])
+                t33m       = numpy.copy(Internal.getNodeFromName1(s, 't33_model')[1])
+                infos      = [zd[0], zname, ListDonor, ListRcv,t11m,t12m,t22m,t13m,t23m,t33m]
+                rcvNode    = dest
+                if rcvNode not in datas: datas[rcvNode] = [infos]
+                else: datas[rcvNode] += [infos]
+    rcvDatas = Cmpi.sendRecv(datas, graphIBCD)
+    datas    = {}
+    
+    for dest in rcvDatas:
+        for [name, zname, ListDonor, ListRcv, t11m,t12m,t22m,t13m,t23m,t33m] in rcvDatas[dest]:
+            zr = znr[zname]
+            connector._WM_getVal2tc(zr, variablesIBC, ListRcv,  
+                                    t11m,t12m,t22m,t13m,t23m,t33m,
+                                    1,nvars, WMvsWMLESLin,
+                                    Internal.__GridCoordinates__,
+                                    Internal.__FlowSolutionNodes__,
+                                    Internal.__FlowSolutionCenters__)
+                            
     return None

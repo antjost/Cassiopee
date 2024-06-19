@@ -654,7 +654,7 @@ namespace K_CONNECTOR
                                   E_Float* tmp, E_Int&  size,
                                   E_Float* param_real,
                                   std::vector<E_Float*>& WIn, std::vector<E_Float*>& WOut,
-                                  E_Int nbptslinelets=0, E_Float* linelets=NULL, E_Int* indexlinelets=NULL);
+                                  E_Int nbptslinelets=0, E_Float* linelets=NULL, E_Int* indexlinelets=NULL,E_Int isSkipFlowFieldWMLES=0);
 
   /* Transferts IBC avec variables (ro,u,v,w,p) en entree/sortie */
   //obsolete
@@ -882,6 +882,7 @@ namespace K_CONNECTOR
   PyObject* ___setQintersectionLBM(PyObject* self, PyObject* args);
   PyObject* _WM_getVal2tc(PyObject* self, PyObject* args);
   PyObject* _WM_setVal2tc(PyObject* self, PyObject* args);
+  PyObject* setCutOffDist(PyObject* self, PyObject* args);
   PyObject* _computeFrictionVelocityIBM(PyObject* self, PyObject* args);
 }
 #endif

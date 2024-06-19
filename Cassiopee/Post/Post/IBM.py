@@ -1029,11 +1029,11 @@ def prepareSkinReconstruction(tb, tc, dimPb=3, ibctypes=[], prepareMLS=False):
 
     return graphIBCDPost, ts
 
-def _computeSkinVariables(ts, tc, graphIBCDPost, dimPb=3, ibctypes=[]):
+def _computeSkinVariables(ts, tc, graphIBCDPost, dimPb=3, ibctypes=[], isPreProjectOrtho=False):
     tl = createCloudIBM__(tc, ibctypes)
     tl = setIBCTransfersPost__(graphIBCDPost, tl)
     tl = T.join(tl)
-    P._projectCloudSolution(tl, ts, dim=dimPb, ibm=True)
+    P._projectCloudSolution(tl, ts, dim=dimPb, ibm=True, isPreProjectOrtho=isPreProjectOrtho)
     Cmpi.barrier()
     return None
 
