@@ -128,14 +128,14 @@ def generateIBMMesh_legacy(tb, vmin=15, snears=0.01, dfar=10., dfarList=[], DEPT
     # type de traitement paroi: pts interieurs ou externes
     model = Internal.getNodeFromName(tb, 'GoverningEquations')
     if model is None: raise ValueError('generateIBMMesh: GoverningEquations is missing in input body tree.')
-     # check Euler non consistant avec Musker
+     # check Euler non consistant avec Musker/WL
 
     if Internal.getValue(model) == 'Euler':
         for z in Internal.getZones(tb):
             ibctype = Internal.getNodeFromName2(z, 'ibctype')
             if ibctype is not None:
                 ibctype = Internal.getValue(ibctype)
-                if ibctype == 'Musker' or ibctype == 'Log':
+                if ibctype == 'Musker' or ibctype == 'Log' or 'WallLaw' in ibctype:
                     raise ValueError("In tb: governing equations (Euler) not consistent with ibc type (%s)"%(ibctype))
     if to is None:
         o = buildOctree(tb, snears=snears, snearFactor=1., dfar=dfar, dfarList=dfarList, to=to, tbox=tbox, snearsf=snearsf,

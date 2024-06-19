@@ -1,6 +1,4 @@
 #     include "IBC/commonLaws1.h" 
-// loi de Musker 
-
 
 // Crocco-Busemann relationship
 //Ta = Tb+0.5*pow(Pr,one_third)/(cv*gamma)*(ub^2-ua^2)
@@ -39,6 +37,15 @@ wt_vec[noind]       = wt;
 mu_vec[noind]       = muwall;
 
 alpha_vec[noind]    = alpha;
+beta_vec[noind]     = beta;
 tcible_vec[noind]   = text;
-#  include "IBC/musker_vec.h"
+
+if (wl_ibm_swtch==1 || wl_ibm_swtch==11 || wl_ibm_swtch==31)
+  {
+# include "IBC/musker_vec.h"
+  }
+else if (wl_ibm_swtch==2 || wl_ibm_swtch==12 || wl_ibm_swtch==32)
+  {
+# include "IBC/SAWL_vec.h"
+  }
 // out= utau  et err 

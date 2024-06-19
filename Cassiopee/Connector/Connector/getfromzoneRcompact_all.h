@@ -30,6 +30,11 @@
            { t  = K_PYTREE::getNodeFromName1(sol, "Density_WM" );
 	     if(t != NULL)ipt_roR_Pnt2[nd] = K_PYTREE::getValueAF(t, hook);
 	   }
+
+	 if(isWMLESLin>0)
+           { t  = K_PYTREE::getNodeFromName1(sol, "t11_model" );
+	     if(t != NULL)ipt_roD_WMLESLin[nd] = K_PYTREE::getValueAF(t, hook);
+	   }
        }
 
        ipt_roD_vert[nd]= NULL; ipt_qD_vert[nd]= NULL; ipt_SD_vert[nd]= NULL; ipt_psiGD_vert[nd]=NULL;

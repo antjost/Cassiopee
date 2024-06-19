@@ -988,7 +988,7 @@ def prepare(t_case, t_out, tc_out, tblank=None, to=None,
     del tp_cart
 
     #-------------------------------------------
-    # Recomputes distance field for Musker only
+    # Recomputes distance field for Musker/WL only
     #-------------------------------------------
     if model != 'Euler':
         ibctypes = set()
@@ -1009,7 +1009,7 @@ def prepare(t_case, t_out, tc_out, tblank=None, to=None,
                 DTW._distance2Walls(tp,tball2,type='ortho', signed=0, dim=dimPb, loc='centers')
             else:
                 DTW._distance2Walls(tp,tball,type='ortho', signed=0, dim=dimPb, loc='centers')
-            test.printMem(">>> wall distance for Musker only [end]")
+            test.printMem(">>> wall distance for Musker/WL only [end]")
 
     test.printMem(">>> Saving [start]")
 

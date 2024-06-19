@@ -213,7 +213,6 @@
 /* stockage pointer volume pour ale deformable*/
 #define PT_VOL       135
 
-
 /*BC types*/
 #define BC_TYPE	      0
 #define BC_IDIR       1
@@ -284,9 +283,10 @@
 #define HYPER_COEF2  56
 
 /*IBM WL*/
-#define MAFZAL_MODE    57
+#define WL_IBM_SWTCH   57
 #define ALPHAGRADP     58
 #define NBPTS_LINELETS 59
+#define WM_IBM_Lin     75 /*flag to linearize WM IBC treatment fv1 */
 
 /*Wire Model - IBM*/
 #define DeltaVWire   60  

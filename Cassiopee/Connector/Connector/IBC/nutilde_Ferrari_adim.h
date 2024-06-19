@@ -9,7 +9,9 @@ E_Float Cv1 = 7.1;
 
 for (E_Int noind = 0; noind < ifin-ideb; noind++)
 {
-  // printf(" noind = %d | utau = %g \n", noind, utau_vec[noind]);
+  // =================================================================================================
+  nulocal           = alpha_vec[noind]/yplus_vec[noind]; //recall:yplus_vec[noind ] = rowall*yibc/muwall = yibc/nulocal
+  // =================================================================================================
   yibc             = mu_vec[noind]*yplus_vec[noind]/ro_vec[noind];
   yplus            = utau_vec[noind]*yplus_vec[noind];
   yplus_vec[noind] = yplus;
@@ -17,8 +19,65 @@ for (E_Int noind = 0; noind < ifin-ideb; noind++)
   denoml10 = yplus*yplus-8.15*yplus+86.;
   denoml10 = denoml10*denoml10;
   
-  umod = utau_vec[noind]*(5.424*atan((2.*yplus-8.15)/16.7) + log10(pow(yplus+10.6,9.6)/denoml10) - 3.52);
-  umod = K_FUNC::E_abs(umod);
+  grad_linear = 0.;
+  if (wl_ibm_swtch==1 || wl_ibm_swtch==11 || wl_ibm_swtch==31){
+    umod = utau_vec[noind]*(5.424*atan((2.*yplus-8.15)/16.7) + log10(pow(yplus+10.6,9.6)/denoml10) - 3.52);
+
+    // =================================================================================================
+    // Near-wall modification of Spalart-Allmaras turbulence model for IBM, Tamaki, Harada, Imamura, 2017
+    // Wall modeling for LES on non-body conforming Cartesian grids, Tamaki & Kawai, 2021
+    // =================================================================================================
+    // linearization --> Umod(Y)=Umod_image - DUmod/DY|image*(Y_image - Y)  
+    // Umod_image = uext_vec[noind]
+    // Y_image    = beta_vec[noind]
+    // Y          = alpha_vec[noind] 
+    // wolfram alpha
+    // t = u_tau
+    // v = kinematic viscosty
+    // y = Y
+    // Musker's law u+ = (5.424 ArcTan[(2 y+ - 8.15)/16.7] + Log[(y+ + 10.6)^9.6/((y+)^2 - 8.15 y+ + 86)^2] - 3.52)
+    // into wolfram alpha
+    // D[t (5.424 ArcTan[(2 t (y/v) - 8.15)/16.7] + Log_10[(t (y/v) + 10.6)^9.6/((t (y/v))^2 - 8.15 t (y/v) + 86)^2] - 3.52), y] 
+    // see below for the answer
+    // d(u_musker)/dy = t^2 ((7.079 v - 1.73718 t y)/(t^2 y^2 - 8.15 t v y + 86 v^2) + 4.16923/(v ((t y)/v + 10.6)^1) + 0.649581/(v (0.00358564 ((2 t y)/v - 8.15)^2 + 1)))
+    // DUmod/DY = utau_vec[noind]**2*(prt1+prt2+prt3)
+
+    prt1        = (7.079*nulocal-1.73718*utau_vec[noind]*beta_vec[noind])/(pow(utau_vec[noind]*beta_vec[noind],2)-8.15*utau_vec[noind]*nulocal*beta_vec[noind]+86*nulocal*nulocal);
+    prt2        = 4.16923/(nulocal*(utau_vec[noind]*beta_vec[noind]/nulocal+10.6));
+    prt3        = 0.649581/(nulocal*(0.00358564*pow((2*utau_vec[noind]*beta_vec[noind]/nulocal-8.15),2)+1));
+
+    grad_linear = pow(utau_vec[noind],2)*(prt1+prt2+prt3);
+  }
+  else if (wl_ibm_swtch==2 || wl_ibm_swtch==12 || wl_ibm_swtch==32){
+    umod = utau_vec[noind]*(BbarSA_WL + c1SA_WL*log(pow(yplus+a1SA_WL,2)+pow(b1SA_WL,2)) 
+			              - c2SA_WL*log(pow(yplus+a2SA_WL,2)+pow(b2SA_WL,2)) 
+			              - c3SA_WL*atan2(b1SA_WL,yplus+a1SA_WL)              
+			              - c4SA_WL*atan2(b2SA_WL,yplus+a2SA_WL));
+    // into wolfram alpha
+    // d/dy(t (B + c_1 log(((y t)/v + a_1)^2 + b_1^2) - c_2 log(((y t)/v + a_2)^2 + b_2^2) - c_3 tan^(-1)((y t)/v + a_1, b_1) - c_4 tan^(-1)((y t)/v + a_2, b_2))) = 
+    // see below for the answer
+    // d(u_sa)/dy = t ((2 c_1 t (a_1 + (t y)/v))/(v ((a_1 + (t y)/v)^2 + b_1^2)) - (2 c_2 t (a_2 + (t y)/v))/(v ((a_2 + (t y)/v)^2 + b_2^2)) + (b_1 c_3 t)/(v ((a_1 + (t y)/v)^2 + b_1^2)) + (b_2 c_4 t)/(v ((a_2 + (t y)/v)^2 + b_2^2)))
+
+    prt1        = (2*c1SA_WL*utau_vec[noind]*(a1SA_WL+utau_vec[noind]*beta_vec[noind]/nulocal))/
+                  (nulocal*(pow(a1SA_WL+utau_vec[noind]*beta_vec[noind]/nulocal,2)+pow(b1SA_WL,2)));
+
+    prt2        = (2*c2SA_WL*utau_vec[noind]*(a2SA_WL+utau_vec[noind]*beta_vec[noind]/nulocal))/
+                  (nulocal*(pow(a2SA_WL+utau_vec[noind]*beta_vec[noind]/nulocal,2)+pow(b2SA_WL,2)));
+
+    prt3        = (b1SA_WL*c3SA_WL*utau_vec[noind])/
+                  (nulocal*(pow(a1SA_WL+utau_vec[noind]*beta_vec[noind]/nulocal,2)+pow(b1SA_WL,2)));
+
+    prt4        = (b2SA_WL*c4SA_WL*utau_vec[noind])/
+                  (nulocal*(pow(a2SA_WL+utau_vec[noind]*beta_vec[noind]/nulocal,2)+pow(b2SA_WL,2)));
+    
+    grad_linear = utau_vec[noind]*(prt1-prt2+prt3+prt4);
+  }
+  nulocal_vec[noind] = grad_linear;
+  umod_lin = uext_vec[noind] - grad_linear*(beta_vec[noind]-alpha_vec[noind]) ;      
+
+  umod     = K_FUNC::E_abs(umod);
+  umod     = (1-linearizeWM)*umod+linearizeWM*umod_lin;
+  // =================================================================================================
 
   ucible0 = sign_vec[noind] * umod;
   ucible_vec[noind] += ucible0 * ut_vec[noind]; // vitesse tangentielle pour le pt IBC

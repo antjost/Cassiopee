@@ -2171,19 +2171,36 @@ def setInterpTransfersD(topTreeD, variables=[], cellNVariable='',
                         variablesIBC=['Density','VelocityX','VelocityY','VelocityZ','Temperature'],
                         bcType=0, varType=2, compact=0, compactD=0,
                         Gamma=1.4, Cv=1.7857142857142865, MuS=1.e-08,
-                        Cs=0.3831337844872463, Ts=1.0, extract=0, alpha=1.):
+                        Cs=0.3831337844872463, Ts=1.0, extract=0, alpha=1., isWireModel=False, isWMLESLin=False):
+    if isWireModel:
+        print("The Wire Mesh Model is currently not surpported by setInterpTransfersD. This model is only integrated in the optimized FastS transfers. Please contact DAAA/DEFI to have this model's capabilities extended to setInterpTransfersD.",flush=True)
+        print("Exiting...",flush=True)
+        exit()
+    if isWMLESLin:
+        print("The WMLES of Kawai & Tamaki of 2021 updates the values in the tc in the module setInterpTransfersD. The transfers of the information from the tc to the t needs to be done aposterior through __setInterpTransfers_WMLESLin",flush=True)
+
     tD = Internal.copyRef(topTreeD)
     return _setInterpTransfersD(tD, variables=variables, cellNVariable=cellNVariable,
                         variablesIBC=variablesIBC,
                         bcType=bcType, varType=varType, compact=compact, compactD=compactD,
                         Gamma=Gamma, Cv=Cv, MuS=MuS,
-                        Cs=Cs, Ts=Ts, extract=extract)
+                        Cs=Cs, Ts=Ts, extract=extract, isWireModel=isWireModel, isWMLESLin=isWMLESLin)
                         
 def _setInterpTransfersD(topTreeD, variables=[], cellNVariable='',
                         variablesIBC=['Density','VelocityX','VelocityY','VelocityZ','Temperature'],
                         bcType=0, varType=2, compact=0, compactD=0,
                         Gamma=1.4, Cv=1.7857142857142865, MuS=1.e-08,
-                        Cs=0.3831337844872463, Ts=1.0, extract=0, alpha=1.):
+                        Cs=0.3831337844872463, Ts=1.0, extract=0, alpha=1., isWireModel=False, isWMLESLin=False):
+    isSkipFlowFieldWMLES=0
+    if isWMLESLin:
+        isSkipFlowFieldWMLES=1;
+    ##if isWireModel:
+    ##    ##The approach is the following
+    ##    ##1) interpolate the values at the additional points for WM
+    ##    ##2) copy these interpolated values into the tc
+    ##    ##3) perfom the ibc & id interpolation as normal, excluding the additional points for WM
+    ##    variables    = ['Density_WM','VelocityX_WM','VelocityY_WM','VelocityZ_WM','Temperature_WM']
+    ##    variablesIBC = []
 
     # Recup des donnees a partir des zones donneuses
     zonesD = Internal.getZones(topTreeD)
@@ -2234,7 +2251,8 @@ def _setInterpTransfersD(topTreeD, variables=[], cellNVariable='',
                                                                  bcType, varType, compact, Gamma, Cv, MuS, Cs, Ts,                                                             
                                                                  Internal.__GridCoordinates__, 
                                                                  Internal.__FlowSolutionNodes__, 
-                                                                 Internal.__FlowSolutionCenters__)
+                                                                 Internal.__FlowSolutionCenters__,
+                                                                 isSkipFlowFieldWMLES)
                         infos.append([dname,arrayT,ListRcv,loc])
 
                     elif sname == 'IB' and "gradxDensity" in variablesIBC:

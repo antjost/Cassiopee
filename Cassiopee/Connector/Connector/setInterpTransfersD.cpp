@@ -316,12 +316,12 @@ PyObject* K_CONNECTOR::__setInterpTransfersD(PyObject* self, PyObject* args)
   PyObject* pyVariables, *pydtloc;
   PyObject *pyParam_int, *pyParam_real;
   E_Int     vartype, type_transfert, no_transfert, It_target;
-  E_Int     nstep, nitmax, rk, exploc, num_passage, rank, isWireModel, isIbmMoving;
+  E_Int     nstep, nitmax, rk, exploc, num_passage, rank, isWireModel, isIbmMoving, isWMLESLin;
 
-  if ( !PYPARSETUPLE_(args, OOOO_ OO_ IIII_ IIII_ IIII_,
+  if ( !PYPARSETUPLE_(args, OOOO_ OO_ IIII_ IIII_ IIII_ I_,
 		      &zonesR,
 		      &zonesD, &pyVariables, &pydtloc, &pyParam_int, &pyParam_real, &It_target, &vartype, &type_transfert,
-		      &no_transfert, &nstep, &nitmax, &rk, &exploc, &num_passage, &rank, &isWireModel, &isIbmMoving) ) 
+		      &no_transfert, &nstep, &nitmax, &rk, &exploc, &num_passage, &rank, &isWireModel, &isIbmMoving, &isWMLESLin) ) 
   {
     return NULL;
   }
@@ -337,6 +337,12 @@ PyObject* K_CONNECTOR::__setInterpTransfersD(PyObject* self, PyObject* args)
   {
     isWireModel_local=-1;
     isWireModel=0;
+  }
+
+  E_Int isSkipFlowFieldWMLES=0;
+  // WMLES - Kawai & Tamaki 2021
+  if (isWMLESLin==1){
+    isSkipFlowFieldWMLES=1;
   }
 
   // gestion nombre de pass pour ID et/ou IBC
@@ -511,7 +517,8 @@ PyObject* K_CONNECTOR::__setInterpTransfersD(PyObject* self, PyObject* args)
   E_Int ptiter = ipt_omp[nssiter+ nstep-1];
 
   E_Int impli_local_init=0;
-  if (isWireModel_local==-1 || isIbmMoving==1){impli_local_init=1;}
+  impli_local_init=1;
+  if (isWireModel_local==-1 || isIbmMoving==1 || isWMLESLin==1){impli_local_init=1;}
     
   for (E_Int nd = 0; nd < nidomR; nd++) {impli_local[nd]=impli_local_init;}
   for (E_Int ntask = 0; ntask < nbtask; ntask++)
@@ -749,7 +756,7 @@ PyObject* K_CONNECTOR::__setInterpTransfersD(PyObject* self, PyObject* args)
   if ( r != 0 ) size      = size + 8 - r;  // on rajoute du bas pour alignememnt 64bits
   if ( ibcTypeMax <= 1 ) size = 0;             // tableau inutile : SP ; voir avec Ivan
 
-  FldArrayF tmp( size * 17 * threadmax_sdm );
+  FldArrayF tmp( size * 19 * threadmax_sdm ); // number of pointers in IBC/pointer.h
   E_Float*  ipt_tmp = tmp.begin();
 
   // tableau temporaire pour utiliser la routine commune setIBCTransfersCommon
@@ -1047,7 +1054,7 @@ PyObject* K_CONNECTOR::__setInterpTransfersD(PyObject* self, PyObject* args)
 						     xPW + nbRcvPts * 2, xPI, xPI + nbRcvPts, xPI + nbRcvPts * 2,
 						     densPtr, 
 						     ipt_tmp, size,ipt_param_realD[NoD], 
-						     vectOfDnrFields, vectOfRcvFields ); 
+						     vectOfDnrFields, vectOfRcvFields, 0, NULL, NULL, isSkipFlowFieldWMLES); 
 
                          if (solver_R==4)
                          {

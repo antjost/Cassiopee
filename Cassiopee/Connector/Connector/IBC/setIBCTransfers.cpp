@@ -67,6 +67,20 @@ E_Int K_CONNECTOR::setIBCTransfersCommonVar1(
   E_Float cc = 5.2;//pour la loi log
   E_Float one_third = 1./3.;
 
+  // WMLES - Kawai & Tamaki 2021
+  E_Int wl_ibm_swtch = 1; //currently hard coded for Musker only
+  E_Float BbarSA_WL  = 5.03339088;
+  E_Float a1SA_WL    = 8.14822158;
+  E_Float a2SA_WL    = -6.92870938;
+  E_Float b1SA_WL    = 7.46008761;
+  E_Float b2SA_WL    = 7.46814579;
+  E_Float c1SA_WL    = 2.54967735;
+  E_Float c2SA_WL    = 1.33016516;
+  E_Float c3SA_WL    = 3.59945911;
+  E_Float c4SA_WL    = 3.63975319;
+
+  E_Float prt1SAWL_prime,prt2SAWL_prime,prt3SAWL_prime,prt4SAWL_prime;
+
   /* fin parametres loi de parois */
 
   E_Int nvars = vectOfDnrFields.size();
@@ -297,7 +311,7 @@ E_Int K_CONNECTOR::setIBCTransfersCommonVar1(
 	    }
 	}
     }
-  else if (bctype == 3)// loi de paroi Musker
+  else if (bctype == 3)// loi de paroi Musker/SA
     {
 #   include "IBC/pointer.h"
 
@@ -483,7 +497,7 @@ E_Int K_CONNECTOR::setIBCTransfersCommonVar2(
 					     E_Float* tmp, E_Int& size,
 					     E_Float*  param_real,
 					     vector<E_Float*>& vectOfDnrFields, vector<E_Float*>& vectOfRcvFields,
-					     E_Int nbptslinelets, E_Float* linelets, E_Int* indexlinelets)
+					     E_Int nbptslinelets, E_Float* linelets, E_Int* indexlinelets, E_Int isSkipFlowFieldWMLES)
 {
   E_Float Pr           = param_real[ PRANDT ];
   E_Float Ts           = param_real[ TEMP0 ];
@@ -498,11 +512,10 @@ E_Int K_CONNECTOR::setIBCTransfersCommonVar2(
   E_Float Delta_V_wire = param_real[ DeltaVWire ];
   E_Float Diam_wire    = param_real[ DiameterWire ];
   E_Float Ct_WM        = param_real[ CtWire ];
-  E_Float R_gas        = Pinf/(Roinf*Tinf);
+  E_Float R_gas        = Pinf/(Roinf*Tinf); 
+ 
+  E_Int   motionType      = (int) param_real[MotionType];  
 
-
-  
-  int   motionType      = (int) param_real[MotionType];
   //[AJ] Keep for now
   //E_Float transpeed[3]    = {param_real[TransSpeed],param_real[TransSpeed+1],param_real[TransSpeed+2]};
   //E_Float axispnt[3]      = {param_real[AxisPnt],param_real[AxisPnt+1],param_real[AxisPnt+2]};
@@ -514,14 +527,48 @@ E_Int K_CONNECTOR::setIBCTransfersCommonVar2(
   E_Float tmp_x,tmp_y,tmp_z;
   E_Float uGrid_local,vGrid_local,wGrid_local;
   E_Float normalVelGrid_local;
-  E_Int c_ale = max(0,min(1,motionType));
-    
+  E_Int c_ale;
+  c_ale = max(0,min(1,motionType));
+
+  // WMLES - Kawai & Tamaki 2021
+  E_Int linearizeWM  = 0;
+  E_Int wl_ibm_swtch = (int) param_real[WL_IBM_SWTCH];
+  E_Float BbarSA_WL  = 5.03339088;
+  E_Float a1SA_WL    = 8.14822158;
+  E_Float a2SA_WL    = -6.92870938;
+  E_Float b1SA_WL    = 7.46008761;
+  E_Float b2SA_WL    = 7.46814579;
+  E_Float c1SA_WL    = 2.54967735;
+  E_Float c2SA_WL    = 1.33016516;
+  E_Float c3SA_WL    = 3.59945911;
+  E_Float c4SA_WL    = 3.63975319;
+  E_Float nulocal, umod_lin,prt1,prt2,prt3,prt4,grad_linear;
+  E_Float prt1SAWL_prime,prt2SAWL_prime,prt3SAWL_prime,prt4SAWL_prime;
+
+  E_Float coefLin = 0.0;
+  E_Float fsLin   = 0.; 
+  E_Float* t11m = NULL; 
+  E_Float* t12m = NULL; 
+  E_Float* t22m = NULL; 
+  E_Float* t13m = NULL; 
+  E_Float* t23m = NULL; 
+  E_Float* t33m = NULL; 
+
+  // WMLES - Kawai & Tamaki 2021
+  if (bctype==33){
+    linearizeWM=1;
+    bctype=3;
+    //wl_ibm_swtch = 11; //MuskerLin - hard coded for F1 & F42 approach
+  }
+
+  //printf("wl_ibm_swtch:: %d \n",wl_ibm_swtch);
+  
   E_Float* pressPtr = densPtr + 1*nbRcvPts;
   E_Float* vxPtr    = densPtr + 2*nbRcvPts;
   E_Float* vyPtr    = densPtr + 3*nbRcvPts; 
   E_Float* vzPtr    = densPtr + 4*nbRcvPts;
 
-  E_Float* utauPtr = NULL;
+  E_Float* utauPtr  = NULL;
   E_Float* yplusPtr = NULL;
   E_Float* kcurvPtr = NULL;
 
@@ -550,28 +597,37 @@ E_Int K_CONNECTOR::setIBCTransfersCommonVar2(
   E_Float* gradyWPtr = NULL;
   E_Float* gradzWPtr = NULL;
 
-  E_Float* motionPtr   = NULL;
+  E_Float* motionPtr     = NULL;
   E_Float* transpeedPtrX = NULL;
   E_Float* transpeedPtrY = NULL;
   E_Float* transpeedPtrZ = NULL;
-  E_Float* axispntPtrX = NULL;
-  E_Float* axispntPtrY = NULL;
-  E_Float* axispntPtrZ = NULL;
-  E_Float* axisvecPtrX = NULL;
-  E_Float* axisvecPtrY = NULL;
-  E_Float* axisvecPtrZ = NULL;
-  E_Float* omgPtr   = NULL;
+  E_Float* axispntPtrX   = NULL;
+  E_Float* axispntPtrY   = NULL;
+  E_Float* axispntPtrZ   = NULL;
+  E_Float* axisvecPtrX   = NULL;
+  E_Float* axisvecPtrY   = NULL;
+  E_Float* axisvecPtrZ   = NULL;
+  E_Float* omgPtr        = NULL;
 
-  E_Float* y_linePtr = NULL;
-  E_Float* u_linePtr = NULL;
-  E_Float* nutilde_linePtr = NULL;
-  E_Float* psi_linePtr = NULL;
-  E_Float* matm_linePtr = NULL;
-  E_Float* mat_linePtr = NULL;
-  E_Float* matp_linePtr = NULL;
+  E_Float* y_linePtr          = NULL;
+  E_Float* u_linePtr          = NULL;
+  E_Float* nutilde_linePtr    = NULL;
+  E_Float* psi_linePtr        = NULL;
+  E_Float* matm_linePtr       = NULL;
+  E_Float* mat_linePtr        = NULL;
+  E_Float* matp_linePtr       = NULL;
   E_Float* alphasbeta_linePtr = NULL;
-  E_Float* index_linePtr = NULL;
+  E_Float* index_linePtr      = NULL;
 
+  // WMLES - Kawai & Tamaki 2021
+  E_Float* t11Ptr = NULL;
+  E_Float* t12Ptr = NULL;
+  E_Float* t22Ptr = NULL;
+  E_Float* t13Ptr = NULL;
+  E_Float* t23Ptr = NULL;
+  E_Float* t33Ptr = NULL;
+
+  //Moving IBMs
   if (motionType==3){
     E_Int shift_var=0;
     // log, Musker, TBLE, MuskerMob, Pohlhausen, Thwaites - also have utau & yplus - need the shift
@@ -632,7 +688,6 @@ E_Int K_CONNECTOR::setIBCTransfersCommonVar2(
       gradyPressPtr = densPtr+8*nbRcvPts;
       gradzPressPtr = densPtr+9*nbRcvPts;
 
-      //E_Int   mafzalMode    = param_real[ MAFZAL_MODE ];
       //E_Float alphaGradP    = param_real[ ALPHAGRADP ];
       //nbptslinelets         = param_real[ NBPTS_LINELETS ];
       // std::cout << "mafzalMode = " << mafzalMode << " alpha = " << alphaGradP << " nbpts linelets = " << nbptslinelets << std::endl;
@@ -679,6 +734,16 @@ E_Int K_CONNECTOR::setIBCTransfersCommonVar2(
       return 0;
     }
 
+  // WMLES - Kawai & Tamaki 2021 
+  if (wl_ibm_swtch > 30){
+    t11Ptr = densPtr+7*nbRcvPts;
+    t12Ptr = densPtr+8*nbRcvPts;
+    t22Ptr = densPtr+9*nbRcvPts;
+    t13Ptr = densPtr+10*nbRcvPts;
+    t23Ptr = densPtr+11*nbRcvPts;
+    t33Ptr = densPtr+12*nbRcvPts;
+  }
+
   /* lois de paroi */
   E_Float roext, uext, pext, text, muext, yext, yplus, yibc, eta, delta;
   E_Float uext_wall,uext_image;
@@ -699,17 +764,17 @@ E_Int K_CONNECTOR::setIBCTransfersCommonVar2(
   E_Float ucible0, ucible, vcible, wcible, tcible, nutilde, signibc, twall, rowall, muwall;
   E_Int npass;
   // Lois de paroi: criteres d'arret pour estimer le frottement par Newton
-  E_Float newtoneps = 1.e-7; // critere d'arret pour u+
+  E_Float newtoneps        = 1.e-7;  // critere d'arret pour u+
   E_Float newtonepsnutilde = 1.e-10; // critere d arret pour nutilde
-  E_Float newtonepsprime = 1.e-12;// critere d'arret pour la derivee
-  E_Float cvgam = cv*(gamma-1.);
-  E_Float cvgaminv = 1./(cvgam);
-  E_Float coefSuth = muS * (1.+Cs/Ts);
-  E_Float Tsinv = 1./Ts;
-  E_Float kappa = 0.4; // Constante de Von Karman
-  E_Float kappainv = 1./kappa;
-  E_Float cc = 5.2; //pour la loi log
-  E_Float one_third = 1./3.;
+  E_Float newtonepsprime   = 1.e-12; // critere d'arret pour la derivee
+  E_Float cvgam            = cv*(gamma-1.);
+  E_Float cvgaminv         = 1./(cvgam);
+  E_Float coefSuth         = muS * (1.+Cs/Ts);
+  E_Float Tsinv            = 1./Ts;
+  E_Float kappa            = 0.4; // Constante de Von Karman
+  E_Float kappainv         = 1./kappa;
+  E_Float cc               = 5.2; //pour la loi log
+  E_Float one_third        = 1./3.;
   /* fin parametres loi de parois*/
 
   E_Int nvars    = vectOfDnrFields.size();
@@ -724,7 +789,6 @@ E_Int K_CONNECTOR::setIBCTransfersCommonVar2(
   E_Float* vOut  = vectOfRcvFields[2];// v
   E_Float* wOut  = vectOfRcvFields[3];// w
   E_Float* tOut  = vectOfRcvFields[4];// temperature
-
 
   E_Float* varSAOut = NULL;
   
@@ -766,6 +830,21 @@ E_Int K_CONNECTOR::setIBCTransfersCommonVar2(
   //---------------------------------
 
   if (nvars == 6) varSAOut = vectOfRcvFields[5]; // nutildeSA
+
+  // WMLES - Kawai & Tamaki 2021
+  if (wl_ibm_swtch > 30)
+    {
+      coefLin = 0.0;
+      fsLin   = 0.;
+      if (isSkipFlowFieldWMLES==0){
+      	t11m   = vectOfRcvFields[5]; // t11_model
+      	t12m   = vectOfRcvFields[6]; // t12_model
+      	t22m   = vectOfRcvFields[7]; // t22_model
+      	t13m   = vectOfRcvFields[8]; // t13_model
+      	t23m   = vectOfRcvFields[9]; // t23_model
+      	t33m   = vectOfRcvFields[10];// t33_model
+      }
+    }
 
   // if ( (bctype==2 || (bctype==3)) && nvars < 6)
   // {
@@ -967,10 +1046,10 @@ E_Int K_CONNECTOR::setIBCTransfersCommonVar2(
     }
   else if (bctype == 3) // loi de paroi Musker
     {
-#   include "IBC/pointer.h" 
+#   include "IBC/pointer.h"
 
       E_Int err  = 0;
-      E_Int skip = 0; 
+      E_Int skip = 0;
       //initialisation parametre geometrique et utau
 #ifdef _OPENMP4
 #pragma omp simd
@@ -988,15 +1067,15 @@ E_Int K_CONNECTOR::setIBCTransfersCommonVar2(
 	  u = uOut[indR];
 	  v = vOut[indR]; 
 	  w = wOut[indR];
-	  
+
 # include "IBC/commonIBCmotionAbs2Rel.h"
 	  //Tangential and Normal velocities: need relative velocity 
-#       include "IBC/commonMuskerLaw_init.h"
+# include "IBC/commonMuskerLaw_init.h"
 	  // out= utau  et err
 	}  
 
       // Newton pour utau
-#    include "IBC/commonMuskerLaw_Newton.h" 
+# include "IBC/commonMuskerLaw_Newton.h" 
 
       //initialisation Newton SA  + vitesse cible
 #if NUTILDE_FERRARI == 0
@@ -1037,9 +1116,7 @@ E_Int K_CONNECTOR::setIBCTransfersCommonVar2(
 
 	      vxPtr[noind+ideb] = uOut[indR];
 	      vyPtr[noind+ideb] = vOut[indR];
-	      vzPtr[noind+ideb] = wOut[indR];
-
-	      
+	      vzPtr[noind+ideb] = wOut[indR];	      
 
 	      // printf("OUT WALL LAW: %f %f %f %f\n",uOut[indR],vOut[indR],wOut[indR],varSAOut[indR]);
 	    }
@@ -1065,8 +1142,9 @@ E_Int K_CONNECTOR::setIBCTransfersCommonVar2(
 	      wOut[indR]     = wcible_vec[noind];
 	      tOut[indR]     = tcible_vec[noind];
 
-# include "IBC/commonIBCmotionRel2Abs.h"  
-
+# include "IBC/commonIBCmotionRel2Abs.h"
+	      // WMLES - Kawai & Tamaki 2021 
+# include "IBC/commonWMLESLin_tijModel.h"
 	      vxPtr[noind+ideb] = uOut[indR];
 	      vyPtr[noind+ideb] = vOut[indR];
 	      vzPtr[noind+ideb] = wOut[indR];
@@ -1872,7 +1950,7 @@ E_Int K_CONNECTOR::setIBCTransfersCommonVar2(
     {
 #   include "IBC/pointer.h"
 
-      E_Float MafzalMode = 3; // param_real[ MAFZAL_MODE ];
+      E_Float MafzalMode = 3; 
 
       E_Int err  = 0;
       E_Int skip = 0;
@@ -2551,6 +2629,19 @@ E_Int K_CONNECTOR::setIBCTransfersCommonVar3(
   E_Float cc = 5.2;//pour la loi log
   E_Float one_third = 1./3.;
 
+  E_Int wl_ibm_swtch = 1; //currently hard coded for Musker only
+  E_Float BbarSA_WL  = 5.03339088;
+  E_Float a1SA_WL    = 8.14822158;
+  E_Float a2SA_WL    = -6.92870938;
+  E_Float b1SA_WL    = 7.46008761;
+  E_Float b2SA_WL    = 7.46814579;
+  E_Float c1SA_WL    = 2.54967735;
+  E_Float c2SA_WL    = 1.33016516;
+  E_Float c3SA_WL    = 3.59945911;
+  E_Float c4SA_WL    = 3.63975319;
+
+  E_Float prt1SAWL_prime,prt2SAWL_prime,prt3SAWL_prime,prt4SAWL_prime;
+
   /* fin parametres loi de parois */
 
   E_Int nvars = vectOfDnrFields.size();
@@ -2909,7 +3000,7 @@ PyObject* K_CONNECTOR::setIBCTransfers(PyObject* self, PyObject* args)
   E_Int nvars;
   if ( varType == 1 || varType == 2 || varType == 3 )
     nvars = 5;
-  else if ( varType == 11 || varType == 21 || varType == 31 )
+  else if ( varType == 11 || varType == 21 || varType == 31 || varType == 32 )
     nvars = 6;
   else
     {
@@ -3210,7 +3301,7 @@ PyObject* K_CONNECTOR::_setIBCTransfers(PyObject* self, PyObject* args)
   E_Int varType = E_Int(vartype);
   if (varType ==  1 || varType ==  2 || varType ==  3) 
     nvars = 5;
-  else if (varType == 11 || varType == 21 || varType == 31)
+  else if (varType == 11 || varType == 21 || varType == 31 || varType == 32)
     nvars = 6;
   else 
     {
@@ -3358,7 +3449,7 @@ PyObject* K_CONNECTOR::_setIBCTransfers(PyObject* self, PyObject* args)
   //printf("size %d %d \n", size, r);
   if (bctype <=1 ) size = 0;               // tableau inutile
 
-  FldArrayF  tmp(size*17*threadmax_sdm);
+  FldArrayF  tmp(size*19*threadmax_sdm);
   E_Float* ipt_tmp = tmp.begin();
 
   E_Float param_real[30]; 
@@ -5228,18 +5319,22 @@ PyObject* K_CONNECTOR::_WM_getVal2tc(PyObject* self, PyObject* args)
   PyObject *pyVariables;
   PyObject *pyIndRcv;
   PyObject *pyArrayDensWM, *pyArrayVelXWM, *pyArrayVelYWM, *pyArrayVelZWM, *pyArrayTempWM, *pyArraySaNuWM;
-  E_Int     loc,nvars;
+  E_Int     loc,nvars,WMvsWMLESLin;
   char* GridCoordinates; char* FlowSolutionNodes; char* FlowSolutionCenters;
 
   if (!PYPARSETUPLE_(args,
-                    OOOO_ OOOO_ O_ II_ SSS_,
+                    OOOO_ OOOO_ O_ III_ SSS_,
                     &zoneR, &pyVariables, &pyIndRcv, 
                     &pyArrayDensWM, &pyArrayVelXWM, &pyArrayVelYWM, &pyArrayVelZWM, &pyArrayTempWM, &pyArraySaNuWM,
-                    &loc,&nvars,
+		    &loc,&nvars,&WMvsWMLESLin,
                     &GridCoordinates,  &FlowSolutionNodes, &FlowSolutionCenters)){
     return NULL;
   }
 
+
+  // reusing this routine for the WMLES Linearization of Kawai and Tamaki of 2021.
+  // dens = t11 | velx = t12 | vely = t22 | velz = t13 | temp = t23 | sanu = t33
+  
   vector<PyArrayObject*> hook;
 
   // recupere les champs du donneur (nodes)
@@ -5286,7 +5381,8 @@ PyObject* K_CONNECTOR::_WM_getVal2tc(PyObject* self, PyObject* args)
 
   if  (loc==0) { solR = K_PYTREE::getNodeFromName1(zoneR , "FlowSolution"        ); }
   else  { solR = K_PYTREE::getNodeFromName1(zoneR , "FlowSolution#Centers"); }
-  t = K_PYTREE::getNodeFromName1(solR, "Density_WM");
+  if (WMvsWMLESLin==1){      t = K_PYTREE::getNodeFromName1(solR, "Density_WM");}
+  else if (WMvsWMLESLin==2){ t = K_PYTREE::getNodeFromName1(solR, "t11_model");}
   iptroR = K_PYTREE::getValueAF(t, hook);
 
   // get type
@@ -5329,22 +5425,39 @@ PyObject* K_CONNECTOR::_WM_getVal2tc(PyObject* self, PyObject* args)
     if (ithread <= r){ ideb = (ithread-1)*(chunk+1); ifin = ideb + (chunk+1); }
     else { ideb = (chunk+1)*r+(ithread-r-1)*chunk; ifin = ideb + chunk; }
 
+    
 
+    if (WMvsWMLESLin==1){
 #ifdef _OPENMP4
 #pragma omp simd
 #endif
-    for (E_Int noind = 0; noind < ifin-ideb; noind++){
-      E_Int indR = rcvPts[noind+ideb];
-      dens[noind+ideb] = vectOfRcvFields[0][indR];
-      velx[noind+ideb] = vectOfRcvFields[1][indR];
-      vely[noind+ideb] = vectOfRcvFields[2][indR];
-      velz[noind+ideb] = vectOfRcvFields[3][indR];
-      temp[noind+ideb] = vectOfRcvFields[4][indR];
-    }
-    if (nvars==6){
       for (E_Int noind = 0; noind < ifin-ideb; noind++){
 	E_Int indR = rcvPts[noind+ideb];
-	sanu[noind+ideb] = vectOfRcvFields[5][indR];
+	dens[noind+ideb] = vectOfRcvFields[0][indR];
+	velx[noind+ideb] = vectOfRcvFields[1][indR];
+	vely[noind+ideb] = vectOfRcvFields[2][indR];
+	velz[noind+ideb] = vectOfRcvFields[3][indR];
+	temp[noind+ideb] = vectOfRcvFields[4][indR];
+      }
+      if (nvars==6){
+	for (E_Int noind = 0; noind < ifin-ideb; noind++){
+	  E_Int indR = rcvPts[noind+ideb];
+	  sanu[noind+ideb] = vectOfRcvFields[5][indR];
+	}
+      }
+    }
+    else{
+#ifdef _OPENMP4
+#pragma omp simd
+#endif
+      for (E_Int noind = 0; noind < ifin-ideb; noind++){
+	E_Int indR = rcvPts[noind+ideb];
+	vectOfRcvFields[0][indR] = dens[noind+ideb];
+	vectOfRcvFields[1][indR] = velx[noind+ideb];
+	vectOfRcvFields[2][indR] = vely[noind+ideb];
+	vectOfRcvFields[3][indR] = velz[noind+ideb];
+	vectOfRcvFields[4][indR] = temp[noind+ideb];
+	vectOfRcvFields[5][indR] = sanu[noind+ideb];
       }
     }
 		 
@@ -5363,7 +5476,6 @@ PyObject* K_CONNECTOR::_WM_getVal2tc(PyObject* self, PyObject* args)
   Py_INCREF(Py_None);
   return Py_None;
 }
-
 //=============================================================================
 // Set the value at the target points in the tc (local) into the real tc (as in the tree itself)
 //=============================================================================
@@ -5468,4 +5580,131 @@ PyObject* K_CONNECTOR::_WM_setVal2tc(PyObject* self, PyObject* args)
   Py_INCREF(Py_None);
   return Py_None;
 }
+//=============================================================================
+// Set distance(x_ip,x_wp) for Tamaki 2017 linearization (Kawai & Tamaki 2021 also)
+//=============================================================================
+PyObject* K_CONNECTOR::setCutOffDist(PyObject* self, PyObject* args)
+{
+  PyObject *zoneR;
+  PyObject *pyVariables;
+  PyObject *pyIndRcv;
+  PyObject *pyArrayXWP, *pyArrayYWP, *pyArrayZWP, *pyArrayXIP, *pyArrayYIP, *pyArrayZIP;
+  E_Int     loc,nvars;
+  char* GridCoordinates; char* FlowSolutionNodes; char* FlowSolutionCenters;
 
+  if (!PYPARSETUPLE_(args,
+                    OOOO_ OOOO_ O_ II_ SSS_,
+                    &zoneR, &pyVariables, &pyIndRcv, 
+		    &pyArrayXWP, &pyArrayYWP, &pyArrayZWP, &pyArrayXIP, &pyArrayYIP, &pyArrayZIP,
+		    &loc,&nvars,
+                    &GridCoordinates,  &FlowSolutionNodes, &FlowSolutionCenters)){
+    return NULL;
+  }
+  
+  vector<PyArrayObject*> hook;
+
+  // recupere les champs du donneur (nodes)
+  E_Int imdjmd, imd, jmd, kmd, ndimdxR, meshtype;
+  E_Float* iptroR;
+
+  /*--------------------------------------*/
+  /* Extraction des indices des receveurs */
+  /*--------------------------------------*/
+  FldArrayI* rcvPtsI;
+  K_NUMPY::getFromNumpyArray(pyIndRcv, rcvPtsI, true);
+  E_Int* rcvPts  = rcvPtsI->begin();
+  E_Int nbRcvPts = rcvPtsI->getSize();
+
+  FldArrayF* xwp_F; FldArrayF* ywp_F; FldArrayF* zwp_F;
+  FldArrayF* xip_F; FldArrayF* yip_F; FldArrayF* zip_F;
+  E_Int okxwp = K_NUMPY::getFromNumpyArray(pyArrayXWP , xwp_F , true);
+  E_Int okywp = K_NUMPY::getFromNumpyArray(pyArrayYWP , ywp_F , true);
+  E_Int okzwp = K_NUMPY::getFromNumpyArray(pyArrayZWP , zwp_F , true);
+  E_Int okxip = K_NUMPY::getFromNumpyArray(pyArrayXIP , xip_F , true);
+  E_Int okyip = K_NUMPY::getFromNumpyArray(pyArrayYIP , yip_F , true);
+  E_Int okzip = K_NUMPY::getFromNumpyArray(pyArrayZIP , zip_F , true);
+  E_Float* xwp = xwp_F->begin();
+  E_Float* ywp = ywp_F->begin();
+  E_Float* zwp = zwp_F->begin();
+  E_Float* xip = xip_F->begin();
+  E_Float* yip = yip_F->begin();
+  E_Float* zip = zip_F->begin();
+
+  vector<E_Float*> vectOfRcvFields(nvars);
+  // les variables a transferes sont compactes: on recuperes uniquement la premiere et la taille
+  //##############################
+  PyObject* solR;
+  PyObject* t;
+  char* type; E_Int s, s0, s1;  E_Int* d;
+
+  PyObject* tpl0= PyList_GetItem(pyVariables, 0);
+  char* varname = NULL;
+  if (PyString_Check(tpl0)) varname = PyString_AsString(tpl0);
+#if PY_VERSION_HEX >= 0x03000000
+  else if (PyUnicode_Check(tpl0)) varname = (char*)PyUnicode_AsUTF8(tpl0);
+#endif
+
+  if  (loc==0) { solR = K_PYTREE::getNodeFromName1(zoneR , "FlowSolution"        ); }
+  else  { solR = K_PYTREE::getNodeFromName1(zoneR , "FlowSolution#Centers"); }
+  t = K_PYTREE::getNodeFromName1(solR, "cutOffDist");
+  iptroR = K_PYTREE::getValueAF(t, hook);
+
+  // get type
+  t =  K_PYTREE::getNodeFromName1(zoneR, "ZoneType");
+  type =  K_PYTREE::getValueS(t, s, hook);
+  // get dims zone receveuse
+  d  =  K_PYTREE::getValueAI(zoneR, s0, s1, hook);
+
+  if  (K_STRING::cmp(type, s, "Structured") == 0){
+    E_Int shift = 0; if(loc == 1) shift = 3;
+    if (s0 == 1) { ndimdxR= d[0+shift]; }
+    else if (s0 == 2) { ndimdxR= d[0+shift]*d[1+shift]; } 
+    else if (s0 == 3) { ndimdxR= d[0+shift]*d[1+shift]*d[2+shift]; } 
+  }
+  else{
+    // non structure
+    ndimdxR= d[0]* d[1]; // npoint, nelements
+  }
+  //##############################
+
+  for (E_Int eq = 0; eq < nvars; eq++){
+    vectOfRcvFields[eq]= iptroR + eq*ndimdxR;
+  }
+
+#    pragma omp parallel default(shared)
+  {
+    //indice loop pour paralelisation omp
+    E_Int ideb, ifin;
+#ifdef _OPENMP
+    E_Int  ithread           = omp_get_thread_num()+1;
+    E_Int  Nbre_thread_actif = omp_get_num_threads(); // nombre de thread actif dans cette zone
+#else
+    E_Int ithread = 1;
+    E_Int Nbre_thread_actif = 1;
+#endif
+    // Calcul du nombre de champs a traiter par chaque thread
+    E_Int chunk = nbRcvPts/Nbre_thread_actif;
+    E_Int r = nbRcvPts - chunk*Nbre_thread_actif;
+    // pts traitees par thread
+    if (ithread <= r){ ideb = (ithread-1)*(chunk+1); ifin = ideb + (chunk+1); }
+    else { ideb = (chunk+1)*r+(ithread-r-1)*chunk; ifin = ideb + chunk; }
+
+    for (E_Int noind = 0; noind < ifin-ideb; noind++){
+      E_Int indR = rcvPts[noind+ideb];
+      vectOfRcvFields[0][indR] = sqrt(pow(xwp[noind+ideb]-xip[noind+ideb],2)+pow(ywp[noind+ideb]-yip[noind+ideb],2)+pow(zwp[noind+ideb]-zip[noind+ideb],2));
+    }		 
+  } // Fin zone // omp
+  // sortie
+  RELEASESHAREDZ(hook, (char*)NULL, (char*)NULL);
+
+  RELEASESHAREDN(pyIndRcv  , rcvPtsI  );
+  RELEASESHAREDN(pyArrayXWP, xwp_F );
+  RELEASESHAREDN(pyArrayYWP, ywp_F );
+  RELEASESHAREDN(pyArrayZWP, zwp_F );
+  RELEASESHAREDN(pyArrayXIP, xip_F );
+  RELEASESHAREDN(pyArrayYIP, yip_F );
+  RELEASESHAREDN(pyArrayZIP, zip_F );
+
+  Py_INCREF(Py_None);
+  return Py_None;
+}
