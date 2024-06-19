@@ -685,7 +685,7 @@ PyObject* K_CONNECTOR::__setInterpTransfers(PyObject* self, PyObject* args)
       if (r != 0) size  = size + 8 - r;        // on rajoute du bas pour alignememnt 64bits
       if (bctype <=1 ) size = 0;               // tableau inutile
 
-      FldArrayF  tmp(size*17*threadmax_sdm);
+      FldArrayF  tmp(size*19*threadmax_sdm);
       E_Float* ipt_tmp=  tmp.begin();
 
       E_Float* xPC     = ptrCoefs + nbInterpD;
@@ -757,18 +757,19 @@ PyObject* K_CONNECTOR::___setInterpTransfers(PyObject* self, PyObject* args)
   PyObject *pyVariables, *pydtloc;
   PyObject *pyParam_int, *pyParam_real;
   E_Int vartype, type_transfert, no_transfert, It_target, nstep, nitmax;
-  E_Int rk, exploc, num_passage, isWireModel;
+  E_Int rk, exploc, num_passage, isWireModel, isWMLESLin;
   
-  if (!PYPARSETUPLE_(args, OOOO_ OO_ IIII_ IIII_ II_,  
+  if (!PYPARSETUPLE_(args, OOOO_ OO_ IIII_ IIII_ III_,  
                     &zonesR, &zonesD, &pyVariables, &pydtloc, &pyParam_int,  
                     &pyParam_real, &It_target, &vartype,
                     &type_transfert, &no_transfert, &nstep, &nitmax, &rk, 
-                    &exploc, &num_passage, &isWireModel))
+                    &exploc, &num_passage, &isWireModel, &isWMLESLin))
   {
     return NULL;
   }
   E_Int rank     = -100;
   E_Int it_target=  E_Int(It_target);
+  
   /* varType :
      1  : conservatives,
      11 : conservatives + ronutildeSA
@@ -794,7 +795,9 @@ PyObject* K_CONNECTOR::___setInterpTransfers(PyObject* self, PyObject* args)
 
   E_Int NoTransfert  = E_Int(no_transfert);
 
-  E_Int kmd, cnNfldD, nvars, meshtype, nvars_Pnt2;
+  E_Int kmd, cnNfldD, nvars, meshtype;
+  E_Int nvars_Pnt2=0;
+  E_Int nvarsWMLESLin=0;
 
   if     ( vartype <= 3 &&  vartype >= 1) nvars =5;
   else if( vartype == 4 ) nvars =32; // LBM transfer, 19 or 27 Qs and 5 macros (32 max in total)
@@ -803,9 +806,9 @@ PyObject* K_CONNECTOR::___setInterpTransfers(PyObject* self, PyObject* args)
   else if( vartype == 5 ) nvars =30;    // Hybrid NSLBM transfer, 5 macros, 19 Qs + 6 gradients
   else                    nvars =6;
 
-  nvars_Pnt2 = 0;
   if (TypeTransfert==0)  isWireModel=0;
-  if (isWireModel>0)     nvars_Pnt2=nvars; // *_WM variables (5 for NSLam & 6 for NSTurb) 
+  if (isWireModel>0)     nvars_Pnt2=nvars;   // *_WM variables (5 for NSLam & 6 for NSTurb)
+  if (isWMLESLin>0)      nvarsWMLESLin = 6;  // WMLES - Kawai & Tamaki 2021 - t11,t12,t22,t13,t23,t33
 
   E_Int nidomR   = PyList_Size(zonesR);
   E_Int nidomD   = PyList_Size(zonesD);
@@ -815,6 +818,7 @@ PyObject* K_CONNECTOR::___setInterpTransfers(PyObject* self, PyObject* args)
   E_Float** ipt_roR; E_Float** ipt_roD; E_Float** ipt_roR_vert;  E_Float** ipt_roD_vert; E_Float** ipt_param_realR;
   E_Float** ipt_roR_Pnt2;
   E_Float** ipt_roD_Pnt2;
+  E_Float** ipt_roD_WMLESLin;
   
   E_Float** ipt_qR; E_Float** ipt_qD; E_Float** ipt_qR_vert; E_Float** ipt_qD_vert;
   E_Float** ipt_SR; E_Float** ipt_SD; E_Float** ipt_SR_vert; E_Float** ipt_SD_vert;
@@ -837,7 +841,7 @@ PyObject* K_CONNECTOR::___setInterpTransfers(PyObject* self, PyObject* args)
   ipt_ndimdxD        = new E_Int[nidomD*8];  //on stocke ndimdx, imd, jmd, en centre et vertexe, meshtype et cnDfld
   ipt_cnd            = new E_Int*[nidomD];
 
-  ipt_roD            = new E_Float*[nidomD*9];  //1
+  ipt_roD            = new E_Float*[nidomD*10];  //1
   ipt_qD             = ipt_roD         + nidomD;//2
   ipt_SD             = ipt_qD          + nidomD;//3
   ipt_psiGD          = ipt_SD          + nidomD;//4
@@ -846,6 +850,7 @@ PyObject* K_CONNECTOR::___setInterpTransfers(PyObject* self, PyObject* args)
   ipt_SD_vert        = ipt_qD_vert     + nidomD;//7
   ipt_psiGD_vert     = ipt_SD_vert     + nidomD;//8
   ipt_roD_Pnt2       = ipt_psiGD_vert  + nidomD;//9
+  ipt_roD_WMLESLin   = ipt_roD_Pnt2    + nidomD;//10
 
   vector<PyArrayObject*> hook;
 
@@ -936,7 +941,7 @@ PyObject* K_CONNECTOR::___setInterpTransfers(PyObject* self, PyObject* args)
   E_Int maxlevel      =  iptdtloc[ 9];  //transfert sur les zones qui recupere leur valeur interpolees en LBM
   E_Int it_cycl_lbm   =  iptdtloc[10];
   E_Int level_it      =  iptdtloc[12+it_cycl_lbm];
-  E_Int max_it        = pow(2, maxlevel-1);
+  E_Int max_it        =  pow(2, maxlevel-1);
 
   E_Int level_next_it =  maxlevel;
   if (it_cycl_lbm != max_it -1 ) { level_next_it = iptdtloc[12 +it_cycl_lbm +1];}
@@ -1030,7 +1035,7 @@ PyObject* K_CONNECTOR::___setInterpTransfers(PyObject* self, PyObject* args)
   if (r != 0) size  = size + 8 - r;           // on rajoute du bas pour alignememnt 64bits
   if (ibcTypeMax <=1 ) size = 0;              // tableau inutile : SP voir avec Ivan
 
-  FldArrayF  tmp(size*17*threadmax_sdm);
+  FldArrayF  tmp(size*19*threadmax_sdm); // number of pointers in IBC/pointer.h
   E_Float* ipt_tmp = tmp.begin();
   
 
@@ -1051,7 +1056,7 @@ PyObject* K_CONNECTOR::___setInterpTransfers(PyObject* self, PyObject* args)
     E_Int indR, type;
     E_Int indD0, indD, i, j, k, ncfLoc/*, nocf*/, indCoef, noi, sizecoefs, /*Nbchunk,*/ imd, jmd, imdjmd;
 
-    vector<E_Float*> vectOfRcvFields(nvars+nvars_Pnt2);
+    vector<E_Float*> vectOfRcvFields(nvars+nvars_Pnt2+nvarsWMLESLin);
     vector<E_Float*> vectOfDnrFields(nvars);
     
     //1ere pass_typ: IBC
@@ -1621,7 +1626,7 @@ PyObject* K_CONNECTOR::___setInterpTransfers4GradP(PyObject* self, PyObject* arg
   if (r != 0) size  = size + 8 - r;           // on rajoute du bas pour alignememnt 64bits
   if (ibcTypeMax <=1 ) size = 0;              // tableau inutile : SP voir avec Ivan
 
-  FldArrayF  tmp(size*17*threadmax_sdm);
+  FldArrayF  tmp(size*19*threadmax_sdm);
   E_Float* ipt_tmp = tmp.begin();
 
   //# pragma omp parallel default(shared)  num_threads(1)

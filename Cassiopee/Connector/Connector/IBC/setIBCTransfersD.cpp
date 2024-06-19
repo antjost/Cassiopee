@@ -87,7 +87,7 @@ PyObject* K_CONNECTOR::setIBCTransfersD(PyObject* self, PyObject* args)
   }
   E_Int nvars;
   if      ( varType ==  1 || varType ==  2 || varType == 3 )  nvars = 5;
-  else if ( varType == 11 || varType == 21 || varType == 31 ) nvars = 6;
+  else if ( varType == 11 || varType == 21 || varType == 31 || varType == 32 ) nvars = 6;
   else
   {
     PyErr_SetString(PyExc_TypeError,
@@ -294,15 +294,15 @@ PyObject* K_CONNECTOR::_setIBCTransfersD(PyObject* self, PyObject* args)
   E_Int bctype, vartype, compact;
   E_Float gamma, cv, muS, Cs, Ts;
   char* GridCoordinates; char* FlowSolutionNodes; char* FlowSolutionCenters;
-
-  if (!PYPARSETUPLE_(args, OOOO_ OOOO_ OOOO_ OOO_ III_ RRRR_ R_ SSS_, 
+  E_Int isSkipFlowFieldWMLES;
+  if (!PYPARSETUPLE_(args, OOOO_ OOOO_ OOOO_ OOO_ III_ RRRR_ R_ SSS_ I_, 
                     &zoneD, &pyVariables, &pyIndDonor, &pyArrayTypes, &pyArrayCoefs, 
                     &pyArrayXPC, &pyArrayYPC, &pyArrayZPC,
                     &pyArrayXPW, &pyArrayYPW, &pyArrayZPW,
                     &pyArrayXPI, &pyArrayYPI, &pyArrayZPI,
                     &pyArrayDens, 
                     &bctype, &vartype, &compact, &gamma, &cv, &muS, &Cs, &Ts,
-                    &GridCoordinates,  &FlowSolutionNodes, &FlowSolutionCenters))
+		     &GridCoordinates,  &FlowSolutionNodes, &FlowSolutionCenters, &isSkipFlowFieldWMLES))
   {
       return NULL;
   }
@@ -470,10 +470,11 @@ PyObject* K_CONNECTOR::_setIBCTransfersD(PyObject* self, PyObject* args)
   if (varType == 2 || varType == 21) 
      setIBCTransfersCommonVar2(bcType, rcvPts, nbRcvPts, ideb, ifin, ithread,
 			      xPC, yPC, zPC, xPW, yPW, zPW, xPI, yPI, zPI, 
-            density, 
-            ipt_tmp, size,
-            param_real,
-            vectOfDnrFields, vectOfRcvFields);
+			      density, 
+			      ipt_tmp, size,
+			      param_real,
+			      vectOfDnrFields, vectOfRcvFields,
+			      0,NULL,NULL,isSkipFlowFieldWMLES);
   else { printf("_setIBCTransfersD: varType must be 2 or 21 \n");}
 
   } // Fin zone // omp
