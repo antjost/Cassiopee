@@ -234,7 +234,6 @@ PyObject* K_CONNECTOR::setIBCTransfersD(PyObject* self, PyObject* args)
     param_real[ TEMP0] = Ts;
     param_real[ PRANDT] = 0.71;
 
-
 #pragma omp parallel default(shared)
  {
 

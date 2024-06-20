@@ -213,7 +213,6 @@
 /* stockage pointer volume pour ale deformable*/
 #define PT_VOL       135
 
-
 /*BC types*/
 #define BC_TYPE	      0
 #define BC_IDIR       1
