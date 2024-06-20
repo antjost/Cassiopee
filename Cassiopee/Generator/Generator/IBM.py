@@ -525,7 +525,7 @@ def generateIBMMeshPara(tb, vmin=15, snears=None, dimPb=3, dfar=10., dfarList=[]
     Cmpi._rmXZones(t)
     coords = None; zones = None
     
-    if symmetry == 0:
+    if symmetry==0:
         _addBCOverlaps(t, bbox=bb)
         _addExternalBCs(t, bbox=bb, dimPb=dimPb)
     else:

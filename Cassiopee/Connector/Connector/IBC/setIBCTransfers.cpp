@@ -790,7 +790,6 @@ E_Int K_CONNECTOR::setIBCTransfersCommonVar2(
   E_Float* wOut  = vectOfRcvFields[3];// w
   E_Float* tOut  = vectOfRcvFields[4];// temperature
 
-
   E_Float* varSAOut = NULL;
   
   //---------------------------------
@@ -1068,7 +1067,7 @@ E_Int K_CONNECTOR::setIBCTransfersCommonVar2(
 	  u = uOut[indR];
 	  v = vOut[indR]; 
 	  w = wOut[indR];
-	  
+
 # include "IBC/commonIBCmotionAbs2Rel.h"
 	  //Tangential and Normal velocities: need relative velocity 
 # include "IBC/commonMuskerLaw_init.h"
@@ -5477,7 +5476,6 @@ PyObject* K_CONNECTOR::_WM_getVal2tc(PyObject* self, PyObject* args)
   Py_INCREF(Py_None);
   return Py_None;
 }
-
 //=============================================================================
 // Set the value at the target points in the tc (local) into the real tc (as in the tree itself)
 //=============================================================================
