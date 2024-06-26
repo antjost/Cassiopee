@@ -687,7 +687,6 @@ def setInterpDataHybride(t_3d, tc_3d, t_curvi, extrusion=None, interpDataType=1)
     
     return t, tc
 
-
 def _redispatch__(t=None, tc=None, tc2=None, twoFronts=False):
     import Distributor2.Mpi as D2mpi
 
