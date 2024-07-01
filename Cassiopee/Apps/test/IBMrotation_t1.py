@@ -12,7 +12,7 @@ import Connector.IBM as X_IBM
 import RigidMotion.PyTree as R
 import Connector.Mpi as Xmpi
 import KCore.test as test
-import math
+import math, os
 
 LOCAL = test.getLocal()
 
@@ -179,6 +179,8 @@ R._copyGrid2GridInit(t)
 C.convertPyTree2File(t, LOCAL+'/t.cgns')
 R._copyGrid2GridInit(tc)
 C.convertPyTree2File(tc, LOCAL+'/tc.cgns')
+
+os.remove(LOCAL+'/octree.cgns')
 
 test.testT(t,1)
 test.testT(tc,2)
