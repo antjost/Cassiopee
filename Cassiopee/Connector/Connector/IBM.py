@@ -350,11 +350,11 @@ def prepareIBMDataPara(t_case, t_out, tc_out, t_in=None, to=None, tbox=None, tin
     if tc2 is not None: return t, tc, tc2
     else: return t, tc
 
-def setInterpDataIBMExtrude(t_case, t_out, tc_out, t, to=None,
+def prepareIBMDataParaExtrude(t_case, t_out, tc_out, t, to=None,
                             depth=2, frontType=1, mode=0, IBCType=1, 
                             verbose=True, check=False, balancing=False, distribute=False, twoFronts=False, cartesian=False,
                             yplus=100., Lref=1., correctionMultiCorpsF42=False, blankingF42=False, wallAdaptF42=None, heightMaxF42=-1., 
-                            tbOneOver=None, extrusion='cart', ):
+                            tbOneOver=None, extrusion='cart'):
     
     import Generator.IBM as G_IBM
     import time as python_time
@@ -442,17 +442,17 @@ def setInterpDataIBMExtrude(t_case, t_out, tc_out, t, to=None,
     
     ##Modify needed for extrude & to replicate previous behavior
     ##Ghost kmin et kmax donneuse potentiel
-    if extrusion is not None:
-        listvars_local =['cellNChim','cellNIBC']
-        for z in Internal.getZones(t):
-            sol            = Internal.getNodeFromName(z,'FlowSolution#Centers')
-            for var in listvars_local:
-                cellN          = Internal.getNodeFromName(sol,var)[1]
-                sh             = numpy.shape(cellN)
-                for k in [0,1, sh[2]-2, sh[2]-1]:
-                    for j in range(sh[1]):
-                        for i in range(sh[0]):
-                            if  cellN[i,j,k] != 0:  cellN[i,j,k] =1
+
+    listvars_local =['cellNChim','cellNIBC']
+    for z in Internal.getZones(t):
+        sol            = Internal.getNodeFromName(z,'FlowSolution#Centers')
+        for var in listvars_local:
+            cellN          = Internal.getNodeFromName(sol,var)[1]
+            sh             = numpy.shape(cellN)
+            for k in [0,1, sh[2]-2, sh[2]-1]:
+                for j in range(sh[1]):
+                    for i in range(sh[0]):
+                        if  cellN[i,j,k] != 0:  cellN[i,j,k] =1
     C._initVars(t,'{centers:cellN}=maximum(0.,{centers:cellNChim})') # vaut -3, 0, 1, 2 initialement
     
     Cmpi.barrier()
@@ -531,9 +531,8 @@ def setInterpDataIBMExtrude(t_case, t_out, tc_out, t, to=None,
     if distribute and Cmpi.size > 1: _redispatch__(t=t, tc=tc, tc2=tc2, twoFronts=twoFronts)
 
     ## New to extrude Prep            
-    if extrusion is not None:
-        vars = ['centers:TurbulentDistanceAllBC','centers:TurbulentDistanceWallBC', 'centers:cellNIBC_hole']
-        C._rmVars(t, vars)
+    vars = ['centers:TurbulentDistanceAllBC','centers:TurbulentDistanceWallBC', 'centers:cellNIBC_hole']
+    C._rmVars(t, vars)
     
     if isinstance(tc_out, str):
         tcp = Compressor.compressCartesian(tc)
