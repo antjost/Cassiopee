@@ -31,7 +31,7 @@ bodySurface = C.convertFile2PyTree(bodySurfaceFile)
 extrusion   = 'cart'
 span        = Lz
 NPas        = 10+1 #number of nodes
-t3D, tb3D   = G_IBM.extrudeCartesianZDir(t2D, bodySurface, extrusion=extrusion, NPas=NPas, span=span,dz=span/(NPas-1), isAutoPeriodic=True)
+t3D, tb3D   = G_IBM.extrudeCartesianZDir(t2D, bodySurface, extrusion=extrusion, NPas=NPas, span=span, dz=span/(NPas-1), isAutoPeriodic=True)
 
 for t in [t3D,tb3D]:
     zmax   = C.getMaxValue(t, 'CoordinateZ');
@@ -44,7 +44,7 @@ test.testT(tb3D ,4)
 #C.convertPyTree2File(tb3D,LOCAL+'/tb3D_checking.cgns')
 
 #####Interpolation 3D
-t3D, tc3D      = X_IBM.setInterpDataIBMExtrude(tb3D,None, None, t3D, extrusion=extrusion)
+t3D, tc3D      = X_IBM.prepareIBMDataParaExtrude(tb3D, None, None, t3D, extrusion=extrusion)
 test.testT(t3D  ,5)
 test.testT(tc3D ,6)
 
