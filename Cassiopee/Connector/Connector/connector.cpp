@@ -112,6 +112,7 @@ static PyMethodDef Pyconnector [] =
   {"___setInterpTransfersLBM", K_CONNECTOR::___setInterpTransfersLBM, METH_VARARGS},
   {"_WM_getVal2tc", K_CONNECTOR::_WM_getVal2tc, METH_VARARGS},
   {"_WM_setVal2tc", K_CONNECTOR::_WM_setVal2tc, METH_VARARGS},
+  {"setCutOffDist", K_CONNECTOR::setCutOffDist, METH_VARARGS},
   {"_computeFrictionVelocity", K_CONNECTOR::_computeFrictionVelocityIBM, METH_VARARGS},
   {NULL, NULL}
 };

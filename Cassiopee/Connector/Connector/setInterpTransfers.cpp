@@ -685,7 +685,7 @@ PyObject* K_CONNECTOR::__setInterpTransfers(PyObject* self, PyObject* args)
       if (r != 0) size  = size + 8 - r;        // on rajoute du bas pour alignememnt 64bits
       if (bctype <=1 ) size = 0;               // tableau inutile
 
-      FldArrayF  tmp(size*17*threadmax_sdm);
+      FldArrayF  tmp(size*19*threadmax_sdm);
       E_Float* ipt_tmp=  tmp.begin();
 
       E_Float* xPC     = ptrCoefs + nbInterpD;
@@ -1030,7 +1030,7 @@ PyObject* K_CONNECTOR::___setInterpTransfers(PyObject* self, PyObject* args)
   if (r != 0) size  = size + 8 - r;           // on rajoute du bas pour alignememnt 64bits
   if (ibcTypeMax <=1 ) size = 0;              // tableau inutile : SP voir avec Ivan
 
-  FldArrayF  tmp(size*17*threadmax_sdm);
+  FldArrayF  tmp(size*19*threadmax_sdm); // number of pointers in IBC/pointer.h
   E_Float* ipt_tmp = tmp.begin();
   
 
@@ -1621,7 +1621,7 @@ PyObject* K_CONNECTOR::___setInterpTransfers4GradP(PyObject* self, PyObject* arg
   if (r != 0) size  = size + 8 - r;           // on rajoute du bas pour alignememnt 64bits
   if (ibcTypeMax <=1 ) size = 0;              // tableau inutile : SP voir avec Ivan
 
-  FldArrayF  tmp(size*17*threadmax_sdm);
+  FldArrayF  tmp(size*19*threadmax_sdm); // number of pointers in IBC/pointer.h
   E_Float* ipt_tmp = tmp.begin();
 
   //# pragma omp parallel default(shared)  num_threads(1)

@@ -11,8 +11,17 @@ while (err == 0 && count < 50)
     if (K_FUNC::E_abs(utauv_vec[noind]) > newtoneps)
     {
       skip = 0; 
+
       //fp
+      if (bctypeLocal == 3 || bctypeLocal ==31 || bctypeLocal ==331)
+      {
 # include "IBC/muskerprime_vec.h"
+      }
+      else if (bctypeLocal == 32 || bctypeLocal == 332)
+      {
+# include "IBC/saprime_vec.h"
+      }
+
       if (K_FUNC::E_abs(fp) >= newtonepsprime) 
       { 
         utau_vec[noind] = K_FUNC::E_abs(utau_vec[noind]-utauv_vec[noind]/fp); 
@@ -20,9 +29,16 @@ while (err == 0 && count < 50)
       else
       {
         skip = 1; 
-      } 
+      }
       
+      if (bctypeLocal == 3 || bctypeLocal ==31 || bctypeLocal ==331)
+      {      
 # include "IBC/musker_vec.h"
+      }
+      else if (bctypeLocal == 32 || bctypeLocal == 332)
+      {
+# include "IBC/sa_vec.h"    
+      }
     }
   }//loop point
   count++;

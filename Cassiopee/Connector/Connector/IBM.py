@@ -1645,7 +1645,7 @@ def _tcInitialize__(tc, tc2=None, ibctypes=[], isWireModel=False):
 
     return None
 
-def _tInitialize__(t, tinit=None, model='NSTurbulent', isWireModel=False):
+def _tInitialize__(t, tc, tinit=None, model='NSTurbulent', isWireModel=False):
     if tinit is None: I._initConst(t, loc='centers')
     else: t = Pmpi.extractMesh(tinit, t, mode='accurate')
 
@@ -1656,6 +1656,20 @@ def _tInitialize__(t, tinit=None, model='NSTurbulent', isWireModel=False):
         for z in Internal.getZones(t):
             for v_local in vars_wm:
                 C._initVars(z,'{centers:'+v_local+'_WM}=0.')
+    isWallLin = 0
+    listIBCLin=["331","332","333"] #MuskerLin,SALin,WMLESLin
+    for z in Internal.getZones(tc):
+        subRegions = Internal.getNodesFromType1(z, 'ZoneSubRegion_t')
+        for s in subRegions:
+            sname   = s[0].split('_')[0]
+            zname   = s[0].split('_')[-1]
+            ibctype = s[0].split('_')[1]
+            if sname[0:2] == 'IB' and ibctype in listIBCLin:
+                isWallLin=1
+                break
+        if isWallLin==1: break
+    isWallLin = Cmpi.allreduce(isWallLin,op=Cmpi.MAX)
+    if isWallLin==1: C._initVars(t, 'centers:cutOffDist', 1.)
     return None
 
 def initializeIBM(t, tc, tb, tinit=None, tbCurvi=None, dimPb=3, twoFronts=False, tbFilament=None):
@@ -1687,7 +1701,7 @@ def initializeIBM(t, tc, tb, tinit=None, tbCurvi=None, dimPb=3, twoFronts=False,
         tc2 = None
         
     _tcInitialize__(tc, tc2=tc2, ibctypes=ibctypes, isWireModel=isWireModel)
-    if t: _tInitialize__(t, tinit=tinit, model=model, isWireModel=isWireModel)
+    if t: _tInitialize__(t, tc, tinit=tinit, model=model, isWireModel=isWireModel)
 
     return t, tc, tc2
 
@@ -4001,3 +4015,99 @@ def doInterp3(t, tc, tbb, tb=None, typeI='ID', dim=3, dictOfADT=None, frontType=
         for dnrname in dictOfADT: C.freeHook(dictOfADT[dnrname])
 
     return tc
+
+#====================================================================================
+#Add the flow field variable cutOffDist needed for the Tamaki et al. 2017 linearization approach 
+def _ComputeCutOffDistFlowField(t, tc, metrics, graph=None):
+
+    wallLawLin = 0
+    if C.isNamePresent(t,'centers:cutOffDist') >= 0: wallLawLin=1
+    wallLawLin = Cmpi.allreduce(wallLawLin,op=Cmpi.MAX)
+    
+    if wallLawLin==1:
+        if Cmpi.rank==0: print("Computing correct cutOffDist for IBM target points", flush=True)
+        ##To be called after the FastS.warmup
+        listIBCLin=["331","332","333"] #MuskerLin,SALin,WMLESLin
+        dest      = Cmpi.rank
+        procDict  = None
+        graphID   = None
+        graphIBCD = None
+        if graph:
+            procDict  = graph['procDict']
+            graphID   = graph['graphID']
+            graphIBCD = graph['graphIBCD']
+        
+        zones = Internal.getZones(t)   
+        C._initVars(zones, '{centers:cutOffDist}={centers:TurbulentDistance}')
+        variablesIBC=['cutOffDist']
+        
+        #transfert
+        if tc is not None:
+            tc_compact = Internal.getNodeFromName1( tc, 'Parameter_real')
+            #Si param_real n'existe pas, alors pas de raccord dans tc
+            if tc_compact is not None:
+               datas = {} 
+               param_real = tc_compact[1]
+               param_int  = Internal.getNodeFromName1(tc, 'Parameter_int' )[1]
+               zonesD     = Internal.getZones(tc)
+               for zd in zonesD:
+                   subRegions = Internal.getNodesFromType1(zd, 'ZoneSubRegion_t')
+                   for s in subRegions:            
+                       sname   = s[0].split('_')[0]
+                       zname   = s[0].split('_')[-1]
+                       ibctype = s[0].split('_')[1]
+                       if sname[0:2] == 'IB' and ibctype in listIBCLin:
+                           xwp       = numpy.copy(Internal.getNodeFromName(s, 'CoordinateX_PW')[1])
+                           ywp       = numpy.copy(Internal.getNodeFromName(s, 'CoordinateY_PW')[1])
+                           zwp       = numpy.copy(Internal.getNodeFromName(s, 'CoordinateZ_PW')[1])
+                           
+                           xip       = numpy.copy(Internal.getNodeFromName(s, 'CoordinateX_PI')[1])
+                           yip       = numpy.copy(Internal.getNodeFromName(s, 'CoordinateY_PI')[1])
+                           zipp      = numpy.copy(Internal.getNodeFromName(s, 'CoordinateZ_PI')[1])
+        
+                           xcp       = numpy.copy(Internal.getNodeFromName(s, 'CoordinateX_PC')[1])
+                           ycp       = numpy.copy(Internal.getNodeFromName(s, 'CoordinateY_PC')[1])
+                           zcpp      = numpy.copy(Internal.getNodeFromName(s, 'CoordinateZ_PC')[1])
+                           
+                           ListRcv   = numpy.copy(Internal.getNodeFromName1(s, 'PointListDonor')[1])
+                           nvars=1
+                           zr   = Internal.getNodeFromName(zones,zname)
+                           if procDict: dest = procDict[zname]
+                           if dest == Cmpi.rank:
+                               Connector.connector.setCutOffDist(zr, variablesIBC, ListRcv,  
+                                                                 xwp,ywp,zwp,xip,yip,zipp,
+                                                                 1,nvars,
+                                                                 Internal.__GridCoordinates__,
+                                                                 Internal.__FlowSolutionNodes__,
+                                                                 Internal.__FlowSolutionCenters__)
+                           else:
+                               lenArray  = len(xwp)
+                               distCutOff= numpy.zeros(lenArray)
+                               for i in range(lenArray):
+                                   distCutOff[i]=numpy.sqrt((xwp[i]-xip[i])**2+
+                                                            (ywp[i]-yip[i])**2+
+                                                            (zwp[i]-zipp[i])**2)
+                               infos = [zname, ListRcv, distCutOff]
+                               rcvNode    = dest
+                               if rcvNode not in datas: datas[rcvNode] = [infos]
+                               else: datas[rcvNode] += [infos]
+               if graphIBCD:
+                   rcvDatas = Cmpi.sendRecv(datas, graphIBCD)
+                   datas    = {}
+                   for dest in rcvDatas:
+                       for [zname, ListRcv, distCutOff] in rcvDatas[dest]:
+                           zr   = Internal.getNodeFromName(zones,zname)
+                           sol        = Internal.getNodeFromName(zr,'FlowSolution#Centers')
+                           cutOffDist = Internal.getNodeFromName(sol,'cutOffDist')[1]
+                           sh          = numpy.shape(cutOffDist)
+                           count=0
+                           for ll in ListRcv:
+                               k = ll//(sh[0]*sh[1])
+                               j = (ll-k*sh[0]*sh[1])//sh[0]
+                               i = ll - j*sh[0] - k*sh[0]*sh[1]
+                               cutOffDist[i,j,k]=distCutOff[count]
+                               count+=1
+        C._initVars(zones, '{centers:cutOffDist}={centers:cutOffDist}/{centers:TurbulentDistance}')
+    return None
+            
+

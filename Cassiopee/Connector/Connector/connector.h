@@ -882,6 +882,7 @@ namespace K_CONNECTOR
   PyObject* ___setQintersectionLBM(PyObject* self, PyObject* args);
   PyObject* _WM_getVal2tc(PyObject* self, PyObject* args);
   PyObject* _WM_setVal2tc(PyObject* self, PyObject* args);
+  PyObject* setCutOffDist(PyObject* self, PyObject* args);
   PyObject* _computeFrictionVelocityIBM(PyObject* self, PyObject* args);
 }
 #endif

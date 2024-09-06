@@ -918,7 +918,7 @@ def _addIBCCoords__(z, zname, correctedPts, wallPts, interpolatedPts, bcType, bc
     zsr[2].append(['VelocityY' , vyNP , [], 'DataArray_t'])
     zsr[2].append(['VelocityZ' , vzNP , [], 'DataArray_t'])
 
-    if bcType in [2, 3, 6, 7, 8, 9, 10, 11, 33]:
+    if bcType in [2, 3, 6, 7, 8, 9, 10, 11, 33, 31, 32, 331, 332]:
         utauNP  = numpy.zeros((nIBC),numpy.float64)
         yplusNP = numpy.zeros((nIBC),numpy.float64)
         zsr[2].append(['utau' , utauNP , [], 'DataArray_t'])

@@ -78,13 +78,13 @@ PyObject* K_CONNECTOR::_computeFrictionVelocityIBM(PyObject* self, PyObject* arg
     E_Float* zPW = fields[poszPW];
 
     if ( posDens == -1 || posu == -1 || posv == -1 || posw == -1 || posPress == -1 || posVisc == -1 || posuTau == -1 ||
-     posyplus == -1 || posxPI== -1 || posyPI == -1 || poszPI == -1 || posxPW == -1 || posyPW == -1 || poszPW == -1 )
-    {
+         posyplus == -1 || posxPI== -1 || posyPI == -1 || poszPI == -1 || posxPW == -1 || posyPW == -1 || poszPW == -1 )
+      {
       PyErr_SetString(PyExc_TypeError,
                       "computeFrictionVelocityIBM: Some required quantities cannot be extracted from zone.");
       RELEASESHAREDZ(hook, varString, eltType);
       return NULL;
-    }
+      }
 
     E_Float ax, l1, l2, l3;
     E_Float roext, uext, pext, muext, yext, rowall, muwall;
@@ -107,8 +107,23 @@ PyObject* K_CONNECTOR::_computeFrictionVelocityIBM(PyObject* self, PyObject* arg
     FldArrayF aa_vec(npts), uext_vec(npts), nutcible_vec(npts);
     FldArrayF ut_vec(npts), vt_vec(npts), wt_vec(npts), mu_vec(npts), alpha_vec(npts), utauv_vec(npts);
 
-      for (E_Int noind = 0; noind < npts; noind++)
-       {
+    E_Float BbarSA_WL  = 5.03339088;
+    E_Float a1SA_WL    = 8.14822158;
+    E_Float a2SA_WL    = -6.92870938;
+    E_Float b1SA_WL    = 7.46008761;
+    E_Float b2SA_WL    = 7.46814579;
+    E_Float c1SA_WL    = 2.54967735;
+    E_Float c2SA_WL    = 1.33016516;
+    E_Float c3SA_WL    = 3.59945911;
+    E_Float c4SA_WL    = 3.63975319;
+    E_Float prt1SAWL_prime,prt2SAWL_prime,prt3SAWL_prime,prt4SAWL_prime;
+    E_Int bctypeLocal;
+    bctypeLocal = 3; //hard coded Musker
+
+
+
+    for (E_Int noind = 0; noind < npts; noind++)
+      {
         roext = densPtr[noind];   // Densite du point interpole.
         pext  = pressPtr[noind];  // Pression du point interpole.
         muext  = viscPtr[noind];  // Viscosite du point interpole.
@@ -118,11 +133,11 @@ PyObject* K_CONNECTOR::_computeFrictionVelocityIBM(PyObject* self, PyObject* arg
         w = wPtr[noind];
 #       include "IBC/commonMuskerLaw_init_constantVars.h"
         // out= utau  et err
-     }
-     // Newton pour utau
+      }
+    // Newton pour utau
 #    include "IBC/commonMuskerLaw_Newton.h"
-     // Compute the correct yplus
-     for (E_Int noind = 0; noind < npts; noind++)
+    // Compute the correct yplus
+    for (E_Int noind = 0; noind < npts; noind++)
       {
         yplus_vec[noind] = aa_vec[noind]*utau_vec[noind];
       }

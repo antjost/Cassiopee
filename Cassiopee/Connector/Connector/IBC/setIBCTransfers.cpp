@@ -83,6 +83,25 @@ E_Int K_CONNECTOR::setIBCTransfersCommonVar1(
   E_Float* varSAOut = NULL;
   if (nvars == 6) varSAOut = vectOfRcvFields[5]; // ronutildeSA
 
+  // SA WL
+  E_Float BbarSA_WL  = 5.03339088;
+  E_Float a1SA_WL    = 8.14822158;
+  E_Float a2SA_WL    = -6.92870938;
+  E_Float b1SA_WL    = 7.46008761;
+  E_Float b2SA_WL    = 7.46814579;
+  E_Float c1SA_WL    = 2.54967735;
+  E_Float c2SA_WL    = 1.33016516;
+  E_Float c3SA_WL    = 3.59945911;
+  E_Float c4SA_WL    = 3.63975319;
+  E_Float nulocal, umod_lin,prt1,prt2,prt3,prt4,grad_linear;
+  E_Float prt1SAWL_prime,prt2SAWL_prime,prt3SAWL_prime,prt4SAWL_prime;
+  
+  E_Int bctypeLocal;
+  bctypeLocal = bctype;
+  if ( bctypeLocal == 32 || bctypeLocal == 331 || bctypeLocal == 332){
+    bctype=3;
+  }
+
   //E_Int* rcvPts = rcvPtsI.begin();
   // if ( (bctype==2 || (bctype==3)) && nvars < 6)
   // {
@@ -297,7 +316,7 @@ E_Int K_CONNECTOR::setIBCTransfersCommonVar1(
 	    }
 	}
     }
-  else if (bctype == 3)// loi de paroi Musker
+  else if (bctype == 3)// loi de paroi Musker/SA
     {
 #   include "IBC/pointer.h"
 
@@ -501,7 +520,6 @@ E_Int K_CONNECTOR::setIBCTransfersCommonVar2(
   E_Float R_gas        = Pinf/(Roinf*Tinf);
 
 
-  E_Int bctypeLocal; 
   int   motionType      = (int) param_real[MotionType];
   //[AJ] Keep for now
   //E_Float transpeed[3]    = {param_real[TransSpeed],param_real[TransSpeed+1],param_real[TransSpeed+2]};
@@ -521,7 +539,7 @@ E_Int K_CONNECTOR::setIBCTransfersCommonVar2(
   E_Float* vyPtr    = densPtr + 3*nbRcvPts; 
   E_Float* vzPtr    = densPtr + 4*nbRcvPts;
 
-  E_Float* utauPtr = NULL;
+  E_Float* utauPtr  = NULL;
   E_Float* yplusPtr = NULL;
   E_Float* kcurvPtr = NULL;
 
@@ -550,37 +568,55 @@ E_Int K_CONNECTOR::setIBCTransfersCommonVar2(
   E_Float* gradyWPtr = NULL;
   E_Float* gradzWPtr = NULL;
 
-  E_Float* motionPtr   = NULL;
+  E_Float* motionPtr     = NULL;
   E_Float* transpeedPtrX = NULL;
   E_Float* transpeedPtrY = NULL;
   E_Float* transpeedPtrZ = NULL;
-  E_Float* axispntPtrX = NULL;
-  E_Float* axispntPtrY = NULL;
-  E_Float* axispntPtrZ = NULL;
-  E_Float* axisvecPtrX = NULL;
-  E_Float* axisvecPtrY = NULL;
-  E_Float* axisvecPtrZ = NULL;
-  E_Float* omgPtr   = NULL;
+  E_Float* axispntPtrX   = NULL;
+  E_Float* axispntPtrY   = NULL;
+  E_Float* axispntPtrZ   = NULL;
+  E_Float* axisvecPtrX   = NULL;
+  E_Float* axisvecPtrY   = NULL;
+  E_Float* axisvecPtrZ   = NULL;
+  E_Float* omgPtr        = NULL;
 
-  E_Float* y_linePtr = NULL;
-  E_Float* u_linePtr = NULL;
+  E_Float* y_linePtr       = NULL;
+  E_Float* u_linePtr       = NULL;
   E_Float* nutilde_linePtr = NULL;
-  E_Float* psi_linePtr = NULL;
-  E_Float* matm_linePtr = NULL;
-  E_Float* mat_linePtr = NULL;
-  E_Float* matp_linePtr = NULL;
+  E_Float* psi_linePtr     = NULL;
+  E_Float* matm_linePtr    = NULL;
+  E_Float* mat_linePtr     = NULL;
+  E_Float* matp_linePtr    = NULL;
   E_Float* alphasbeta_linePtr = NULL;
-  E_Float* index_linePtr = NULL;
+  E_Float* index_linePtr      = NULL;
+
+  // SA WL
+  E_Float BbarSA_WL  = 5.03339088;
+  E_Float a1SA_WL    = 8.14822158;
+  E_Float a2SA_WL    = -6.92870938;
+  E_Float b1SA_WL    = 7.46008761;
+  E_Float b2SA_WL    = 7.46814579;
+  E_Float c1SA_WL    = 2.54967735;
+  E_Float c2SA_WL    = 1.33016516;
+  E_Float c3SA_WL    = 3.59945911;
+  E_Float c4SA_WL    = 3.63975319;
+  E_Float nulocal, umod_lin,prt1,prt2,prt3,prt4,grad_linear;
+  E_Float prt1SAWL_prime,prt2SAWL_prime,prt3SAWL_prime,prt4SAWL_prime;
 
   // bctype = 3 for all Musker, SA, MuskerLin, & SALin to avoid adding
   // more bctype conditions in if statements.
   // bctypeLocal will be kept for a flag switch for SA (32), MuskerLin (331), & SALin (332).
   // These are in development and will be added in the near future.
+  E_Int bctypeLocal, linearizeWM;
+  linearizeWM = 0;
   bctypeLocal = bctype;
   if ( bctypeLocal == 32 || bctypeLocal == 331 || bctypeLocal == 332){
     bctype=3;
+    if ( bctypeLocal == 331 || bctypeLocal == 332){
+      linearizeWM=1;
+    }
   }
-  
+
   if (motionType==3){
     E_Int shift_var=0;
     // log, Musker, TBLE, MuskerMob, Pohlhausen, Thwaites - also have utau & yplus - need the shift
@@ -641,10 +677,8 @@ E_Int K_CONNECTOR::setIBCTransfersCommonVar2(
       gradyPressPtr = densPtr+8*nbRcvPts;
       gradzPressPtr = densPtr+9*nbRcvPts;
 
-      //E_Int   mafzalMode    = param_real[ MAFZAL_MODE ];
       //E_Float alphaGradP    = param_real[ ALPHAGRADP ];
       //nbptslinelets         = param_real[ NBPTS_LINELETS ];
-      // std::cout << "mafzalMode = " << mafzalMode << " alpha = " << alphaGradP << " nbpts linelets = " << nbptslinelets << std::endl;
     }
   else if (bctype == 11) // TBLE-FULL
     {
@@ -708,17 +742,17 @@ E_Int K_CONNECTOR::setIBCTransfersCommonVar2(
   E_Float ucible0, ucible, vcible, wcible, tcible, nutilde, signibc, twall, rowall, muwall;
   E_Int npass;
   // Lois de paroi: criteres d'arret pour estimer le frottement par Newton
-  E_Float newtoneps = 1.e-7; // critere d'arret pour u+
+  E_Float newtoneps        = 1.e-7; // critere d'arret pour u+
   E_Float newtonepsnutilde = 1.e-10; // critere d arret pour nutilde
-  E_Float newtonepsprime = 1.e-12;// critere d'arret pour la derivee
-  E_Float cvgam = cv*(gamma-1.);
-  E_Float cvgaminv = 1./(cvgam);
-  E_Float coefSuth = muS * (1.+Cs/Ts);
-  E_Float Tsinv = 1./Ts;
-  E_Float kappa = 0.4; // Constante de Von Karman
-  E_Float kappainv = 1./kappa;
-  E_Float cc = 5.2; //pour la loi log
-  E_Float one_third = 1./3.;
+  E_Float newtonepsprime   = 1.e-12;// critere d'arret pour la derivee
+  E_Float cvgam            = cv*(gamma-1.);
+  E_Float cvgaminv         = 1./(cvgam);
+  E_Float coefSuth         = muS * (1.+Cs/Ts);
+  E_Float Tsinv            = 1./Ts;
+  E_Float kappa            = 0.4; // Constante de Von Karman
+  E_Float kappainv         = 1./kappa;
+  E_Float cc               = 5.2; //pour la loi log
+  E_Float one_third        = 1./3.;
   /* fin parametres loi de parois*/
 
   E_Int nvars    = vectOfDnrFields.size();
@@ -1000,12 +1034,12 @@ E_Int K_CONNECTOR::setIBCTransfersCommonVar2(
 	  
 # include "IBC/commonIBCmotionAbs2Rel.h"
 	  //Tangential and Normal velocities: need relative velocity 
-#       include "IBC/commonMuskerLaw_init.h"
+# include "IBC/commonMuskerLaw_init.h"
 	  // out= utau  et err
 	}  
 
       // Newton pour utau
-#    include "IBC/commonMuskerLaw_Newton.h" 
+# include "IBC/commonMuskerLaw_Newton.h" 
 
       //initialisation Newton SA  + vitesse cible
 #if NUTILDE_FERRARI == 0
@@ -1881,7 +1915,7 @@ E_Int K_CONNECTOR::setIBCTransfersCommonVar2(
     {
 #   include "IBC/pointer.h"
 
-      E_Float MafzalMode = 3; // param_real[ MAFZAL_MODE ];
+      E_Float MafzalMode = 3; 
 
       E_Int err  = 0;
       E_Int skip = 0;
@@ -2575,6 +2609,27 @@ E_Int K_CONNECTOR::setIBCTransfersCommonVar3(
   E_Float* pOut = vectOfRcvFields[4];// pressure
   E_Float* varSAOut = NULL;
   if ( nvars == 6 ) varSAOut = vectOfRcvFields[5];//ronutildeSA
+
+
+  // SA WL
+  E_Float BbarSA_WL  = 5.03339088;
+  E_Float a1SA_WL    = 8.14822158;
+  E_Float a2SA_WL    = -6.92870938;
+  E_Float b1SA_WL    = 7.46008761;
+  E_Float b2SA_WL    = 7.46814579;
+  E_Float c1SA_WL    = 2.54967735;
+  E_Float c2SA_WL    = 1.33016516;
+  E_Float c3SA_WL    = 3.59945911;
+  E_Float c4SA_WL    = 3.63975319;
+  E_Float nulocal, umod_lin,prt1,prt2,prt3,prt4,grad_linear;
+  E_Float prt1SAWL_prime,prt2SAWL_prime,prt3SAWL_prime,prt4SAWL_prime;
+  
+  E_Int bctypeLocal; 
+  bctypeLocal = bctype;
+  if ( bctypeLocal == 32 || bctypeLocal == 331 || bctypeLocal == 332){
+    bctype=3;
+  }
+  
   // if ( (bctype==2 || (bctype==3)) && nvars < 6)
   // {
   //   printf("Warning: setIBCTransfersCommonVar3: number of variables (<6) inconsistent with bctype.\n");
@@ -3118,7 +3173,7 @@ PyObject* K_CONNECTOR::setIBCTransfers(PyObject* self, PyObject* args)
   E_Int    r =  size % 8;
   size = size + r;                  // on rajoute du bas pour alignememnt 64bits
 
-  FldArrayF  tmp(size*17*threadmax_sdm);
+  FldArrayF  tmp(size*19*threadmax_sdm);
   E_Float* ipt_tmp=  tmp.begin();
 
   {
@@ -3367,7 +3422,7 @@ PyObject* K_CONNECTOR::_setIBCTransfers(PyObject* self, PyObject* args)
   //printf("size %d %d \n", size, r);
   if (bctype <=1 ) size = 0;               // tableau inutile
 
-  FldArrayF  tmp(size*17*threadmax_sdm);
+  FldArrayF  tmp(size*19*threadmax_sdm);
   E_Float* ipt_tmp = tmp.begin();
 
   E_Float param_real[30]; 
@@ -5478,3 +5533,131 @@ PyObject* K_CONNECTOR::_WM_setVal2tc(PyObject* self, PyObject* args)
   return Py_None;
 }
 
+//=============================================================================
+// Set distance(x_ip,x_wp) for Tamaki 2017 linearization (Kawai & Tamaki 2021 also)
+//=============================================================================
+PyObject* K_CONNECTOR::setCutOffDist(PyObject* self, PyObject* args)
+{
+  PyObject *zoneR;
+  PyObject *pyVariables;
+  PyObject *pyIndRcv;
+  PyObject *pyArrayXWP, *pyArrayYWP, *pyArrayZWP, *pyArrayXIP, *pyArrayYIP, *pyArrayZIP;
+  E_Int     loc,nvars;
+  char* GridCoordinates; char* FlowSolutionNodes; char* FlowSolutionCenters;
+
+  if (!PYPARSETUPLE_(args,
+                    OOOO_ OOOO_ O_ II_ SSS_,
+                    &zoneR, &pyVariables, &pyIndRcv,
+                   &pyArrayXWP, &pyArrayYWP, &pyArrayZWP, &pyArrayXIP, &pyArrayYIP, &pyArrayZIP,
+                   &loc,&nvars,
+                    &GridCoordinates,  &FlowSolutionNodes, &FlowSolutionCenters)){
+    return NULL;
+  }
+
+  vector<PyArrayObject*> hook;
+
+  // recupere les champs du donneur (nodes)
+  E_Int imdjmd, imd, jmd, kmd, ndimdxR, meshtype;
+  E_Float* iptroR;
+
+  /*--------------------------------------*/
+  /* Extraction des indices des receveurs */
+  /*--------------------------------------*/
+  FldArrayI* rcvPtsI;
+  K_NUMPY::getFromNumpyArray(pyIndRcv, rcvPtsI, true);
+  E_Int* rcvPts  = rcvPtsI->begin();
+  E_Int nbRcvPts = rcvPtsI->getSize();
+
+  FldArrayF* xwp_F; FldArrayF* ywp_F; FldArrayF* zwp_F;
+  FldArrayF* xip_F; FldArrayF* yip_F; FldArrayF* zip_F;
+  E_Int okxwp = K_NUMPY::getFromNumpyArray(pyArrayXWP , xwp_F , true);
+  E_Int okywp = K_NUMPY::getFromNumpyArray(pyArrayYWP , ywp_F , true);
+  E_Int okzwp = K_NUMPY::getFromNumpyArray(pyArrayZWP , zwp_F , true);
+  E_Int okxip = K_NUMPY::getFromNumpyArray(pyArrayXIP , xip_F , true);
+  E_Int okyip = K_NUMPY::getFromNumpyArray(pyArrayYIP , yip_F , true);
+  E_Int okzip = K_NUMPY::getFromNumpyArray(pyArrayZIP , zip_F , true);
+  E_Float* xwp = xwp_F->begin();
+  E_Float* ywp = ywp_F->begin();
+  E_Float* zwp = zwp_F->begin();
+  E_Float* xip = xip_F->begin();
+  E_Float* yip = yip_F->begin();
+  E_Float* zip = zip_F->begin();
+
+  vector<E_Float*> vectOfRcvFields(nvars);
+  // les variables a transferes sont compactes: on recuperes uniquement la premiere et la taille
+  //##############################
+  PyObject* solR;
+  PyObject* t;
+  char* type; E_Int s, s0, s1;  E_Int* d;
+
+  PyObject* tpl0= PyList_GetItem(pyVariables, 0);
+  char* varname = NULL;
+  if (PyString_Check(tpl0)) varname = PyString_AsString(tpl0);
+#if PY_VERSION_HEX >= 0x03000000
+  else if (PyUnicode_Check(tpl0)) varname = (char*)PyUnicode_AsUTF8(tpl0);
+#endif
+
+  if  (loc==0) { solR = K_PYTREE::getNodeFromName1(zoneR , "FlowSolution"        ); }
+  else  { solR = K_PYTREE::getNodeFromName1(zoneR , "FlowSolution#Centers"); }
+  t = K_PYTREE::getNodeFromName1(solR, "cutOffDist");
+  iptroR = K_PYTREE::getValueAF(t, hook);
+
+  // get type
+  t =  K_PYTREE::getNodeFromName1(zoneR, "ZoneType");
+  type =  K_PYTREE::getValueS(t, s, hook);
+  // get dims zone receveuse
+  d  =  K_PYTREE::getValueAI(zoneR, s0, s1, hook);
+
+  if  (K_STRING::cmp(type, s, "Structured") == 0){
+    E_Int shift = 0; if(loc == 1) shift = 3;
+    if (s0 == 1) { ndimdxR= d[0+shift]; }
+    else if (s0 == 2) { ndimdxR= d[0+shift]*d[1+shift]; }
+    else if (s0 == 3) { ndimdxR= d[0+shift]*d[1+shift]*d[2+shift]; }
+  }
+  else{
+    // non structure
+    ndimdxR= d[0]* d[1]; // npoint, nelements
+  }
+  //##############################
+
+  for (E_Int eq = 0; eq < nvars; eq++){
+    vectOfRcvFields[eq]= iptroR + eq*ndimdxR;
+  }
+
+#    pragma omp parallel default(shared)
+  {
+    //indice loop pour paralelisation omp
+    E_Int ideb, ifin;
+#ifdef _OPENMP
+    E_Int  ithread           = omp_get_thread_num()+1;
+    E_Int  Nbre_thread_actif = omp_get_num_threads(); // nombre de thread actif dans cette zone
+#else
+    E_Int ithread = 1;
+    E_Int Nbre_thread_actif = 1;
+#endif
+    // Calcul du nombre de champs a traiter par chaque thread
+    E_Int chunk = nbRcvPts/Nbre_thread_actif;
+    E_Int r = nbRcvPts - chunk*Nbre_thread_actif;
+    // pts traitees par thread
+    if (ithread <= r){ ideb = (ithread-1)*(chunk+1); ifin = ideb + (chunk+1); }
+    else { ideb = (chunk+1)*r+(ithread-r-1)*chunk; ifin = ideb + chunk; }
+
+    for (E_Int noind = 0; noind < ifin-ideb; noind++){
+      E_Int indR = rcvPts[noind+ideb];
+      vectOfRcvFields[0][indR] = sqrt(pow(xwp[noind+ideb]-xip[noind+ideb],2)+pow(ywp[noind+ideb]-yip[noind+ideb],2)+pow(zwp[noind+ideb]-zip[noind+ideb],2));
+    }
+  } // Fin zone // omp
+  // sortie
+  RELEASESHAREDZ(hook, (char*)NULL, (char*)NULL);
+
+  RELEASESHAREDN(pyIndRcv  , rcvPtsI  );
+  RELEASESHAREDN(pyArrayXWP, xwp_F );
+  RELEASESHAREDN(pyArrayYWP, ywp_F );
+  RELEASESHAREDN(pyArrayZWP, zwp_F );
+  RELEASESHAREDN(pyArrayXIP, xip_F );
+  RELEASESHAREDN(pyArrayYIP, yip_F );
+  RELEASESHAREDN(pyArrayZIP, zip_F );
+
+  Py_INCREF(Py_None);
+  return Py_None;
+}

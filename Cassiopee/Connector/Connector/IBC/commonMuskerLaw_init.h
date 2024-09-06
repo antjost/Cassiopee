@@ -1,7 +1,4 @@
 #     include "IBC/commonLaws1.h" 
-// loi de Musker 
-
-
 // Crocco-Busemann relationship
 //Ta = Tb+0.5*pow(Pr,one_third)/(cv*gamma)*(ub^2-ua^2)
 //In this case a=wall & b=ext(image)
@@ -39,6 +36,17 @@ wt_vec[noind]       = wt;
 mu_vec[noind]       = muwall;
 
 alpha_vec[noind]    = alpha;
+beta_vec[noind]     = beta;
 tcible_vec[noind]   = text;
-#  include "IBC/musker_vec.h"
+
+
+if (bctypeLocal == 3 || bctypeLocal ==31 || bctypeLocal ==331)
+{
+# include "IBC/musker_vec.h"
+}
+else if (bctypeLocal == 32 || bctypeLocal == 332)
+{
+# include "IBC/sa_vec.h"    
+}
+
 // out= utau  et err 
