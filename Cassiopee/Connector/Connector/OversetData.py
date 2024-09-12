@@ -943,7 +943,7 @@ def _addIBCCoords__(z, zname, correctedPts, wallPts, interpolatedPts, bcType, bc
         Internal._createChild(zsr, 'Temperature_WM'       , 'DataArray_t', value=val_local)
         Internal._createChild(zsr, 'TurbulentSANuTilde_WM', 'DataArray_t', value=val_local)
 
-    if bcType == 33 and model=='NSLaminar':
+    if bcType in [331, 332] and model=='NSLaminar':
         val_local = numpy.zeros((nIBC),numpy.float64)
         Internal._createChild(zsr, 't11_model', 'DataArray_t', value=val_local)
         Internal._createChild(zsr, 't12_model', 'DataArray_t', value=val_local)
@@ -2185,9 +2185,22 @@ def _setInterpTransfersD(topTreeD, variables=[], cellNVariable='',
                         bcType=0, varType=2, compact=0, compactD=0,
                         Gamma=1.4, Cv=1.7857142857142865, MuS=1.e-08,
                         Cs=0.3831337844872463, Ts=1.0, extract=0, alpha=1.):
-
+    import Connector.IBM as X_IBM
     # Recup des donnees a partir des zones donneuses
     zonesD = Internal.getZones(topTreeD)
+
+    ##if isWireModel:
+    ##    ##The approach is the following
+    ##    ##1) interpolate the values at the additional points for WM
+    ##    ##2) copy these interpolated values into the tc
+    ##    ##3) perfom the ibc & id interpolation as normal, excluding the additional points for WM
+    ##    variables    = ['Density_WM','VelocityX_WM','VelocityY_WM','VelocityZ_WM','Temperature_WM']
+    ##    variablesIBC = []
+
+
+    isWallLin, dummyTmp  = X_IBM.checkIsWallLin__(zonesD)
+    #The WMLES of Kawai & Tamaki of 2021 updates the values in the tc in the module setInterpTransfersD. The transfers of the information from the tc to the t needs to be done aposterior through __setInterpTransfers_WMLESLin
+
     infos = []
     for zd in zonesD:
         subRegions = Internal.getNodesFromType1(zd, 'ZoneSubRegion_t')

@@ -27,6 +27,10 @@ import KCore
 import numpy
 import math
 
+##Note: WMLES - Kawai & Tamaki 2021 - Wall modeling for large-eddy simulation on non-body-conforming Cartesian grids
+##      Phys. Rev. Fluids 6, 114603  Published 24 November 2021
+##
+
 varsn       = ['gradxTurbulentDistance','gradyTurbulentDistance','gradzTurbulentDistance']
 varsnDouble = ['gradxTurbulentDistanceDouble','gradyTurbulentDistanceDouble','gradzTurbulentDistanceDouble']
 TOLDIST     = 1.e-14
@@ -1656,20 +1660,15 @@ def _tInitialize__(t, tc, tinit=None, model='NSTurbulent', isWireModel=False):
         for z in Internal.getZones(t):
             for v_local in vars_wm:
                 C._initVars(z,'{centers:'+v_local+'_WM}=0.')
-    isWallLin = 0
-    listIBCLin=["331","332","333"] #MuskerLin,SALin,WMLESLin
-    for z in Internal.getZones(tc):
-        subRegions = Internal.getNodesFromType1(z, 'ZoneSubRegion_t')
-        for s in subRegions:
-            sname   = s[0].split('_')[0]
-            zname   = s[0].split('_')[-1]
-            ibctype = s[0].split('_')[1]
-            if sname[0:2] == 'IB' and ibctype in listIBCLin:
-                isWallLin=1
-                break
-        if isWallLin==1: break
-    isWallLin = Cmpi.allreduce(isWallLin,op=Cmpi.MAX)
-    if isWallLin==1: C._initVars(t, 'centers:cutOffDist', 1.)
+
+    isWallLin, dummyTmp  = checkIsWallLin__(Internal.getZones(tc))            
+    if isWallLin==1: 
+        C._initVars(t, 'centers:cutOffDist', 1.)
+        ## WMLES - Kawai & Tamaki 2021
+        if model=='NSLaminar' :
+            listTijModel =['t11_model','t12_model','t22_model','t13_model','t23_model','t33_model']
+            for v in listTijModel: C._initVars(t, 'centers:'+v, 0.)
+
     return None
 
 def initializeIBM(t, tc, tb, tinit=None, tbCurvi=None, dimPb=3, twoFronts=False, tbFilament=None):
@@ -2069,6 +2068,7 @@ def _extractIBMInfo_param(t, tc):
 # pts IBM a corriger, paroi, miroirs
 #=============================================================================
 def extractIBMInfo(tc_in, IBCNames="IBCD_*", fileout=None):
+    
     """Extract IBM informations in a pyTree."""
     if isinstance(tc_in, str): tc = Cmpi.convertFile2PyTree(tc_in, proc=Cmpi.rank)
     else: tc = tc_in
@@ -4017,13 +4017,12 @@ def doInterp3(t, tc, tbb, tb=None, typeI='ID', dim=3, dictOfADT=None, frontType=
     return tc
 
 #====================================================================================
-#Add the flow field variable cutOffDist needed for the Tamaki et al. 2017 linearization approach 
+##Add the flow field variable cutOffDist needed for the Tamaki et al. 2017 linearization approach
+## Needs to be called after the FastS warmup
 def _ComputeCutOffDistFlowField(t, tc, metrics, graph=None):
-
-    wallLawLin = 0
-    if C.isNamePresent(t,'centers:cutOffDist') >= 0: wallLawLin=1
-    wallLawLin = Cmpi.allreduce(wallLawLin,op=Cmpi.MAX)
-    
+    """Set the cut off distance flow field variable for Tamaki et al. 2017 linearization approach."""
+    ##Tamaki et al. 2017 and  Kawai & Tamaki 2021
+    wallLawLin, dummyTmp  = checkIsWallLin__(Internal.getZones(tc))    
     if wallLawLin==1:
         if Cmpi.rank==0: print("Computing correct cutOffDist for IBM target points", flush=True)
         ##To be called after the FastS.warmup
@@ -4111,3 +4110,34 @@ def _ComputeCutOffDistFlowField(t, tc, metrics, graph=None):
     return None
             
 
+def checkIsWallLin__(zonesD):
+    ####Tamaki et al. 2017 and  Kawai & Tamaki 2021
+    isWallLin = 0
+    isLES     = 0
+    listIBCLin= ["331","332"] #MuskerLin,SALin
+
+    for z in zonesD:
+        subRegions = Internal.getNodesFromType1(z, 'ZoneSubRegion_t')
+        for s in subRegions:
+            sname   = s[0].split('_')[0]
+            zname   = s[0].split('_')[-1]
+            ibctype = s[0].split('_')[1]
+            if sname[0:2] == 'IB' and ibctype in listIBCLin:
+                isWallLin=1
+                break
+        if isWallLin==1: break
+    isWallLin = Cmpi.allreduce(isWallLin,op=Cmpi.MAX)
+    if isWallLin==0: return isWallLin,isLES
+    
+    for z in zonesD:
+        subRegions = Internal.getNodesFromType1(z, 'ZoneSubRegion_t')
+        for s in subRegions:
+            sname   = s[0].split('_')[0]
+            zname   = s[0].split('_')[-1]
+            ibctype = s[0].split('_')[1]
+            if sname[0:2] == 'IB' and ibctype in listIBCLin:
+                tijCheck = Internal.getNodeFromName1(s, 't11_model')
+                if tijCheck: isLES = 1
+        if isLES==1: break
+    isLES = Cmpi.allreduce(isLES,op=Cmpi.MAX)                    
+    return isWallLin,isLES

@@ -28,6 +28,10 @@ using namespace K_FLD;
 # include "IBC/commonLaws.h"
 # define NUTILDE_FERRARI 2
 
+//Note: WMLES - Kawai & Tamaki 2021 - Wall modeling for large-eddy simulation on non-body-conforming Cartesian grids
+//      Phys. Rev. Fluids 6, 114603  Published 24 November 2021
+//
+
 //=============================================================================
 //Retourne -2: incoherence entre meshtype et le type d interpolation
 //         -1: type invalide
@@ -101,6 +105,8 @@ E_Int K_CONNECTOR::setIBCTransfersCommonVar1(
   if ( bctypeLocal == 32 || bctypeLocal == 331 || bctypeLocal == 332){
     bctype=3;
   }
+  bctypeLocal = bctype;
+  //IMPORTANT NOTE:: currently hard coded for Musker only
 
   //E_Int* rcvPts = rcvPtsI.begin();
   // if ( (bctype==2 || (bctype==3)) && nvars < 6)
@@ -520,7 +526,7 @@ E_Int K_CONNECTOR::setIBCTransfersCommonVar2(
   E_Float R_gas        = Pinf/(Roinf*Tinf);
 
 
-  int   motionType      = (int) param_real[MotionType];
+  E_Int   motionType      = (int) param_real[MotionType];
   //[AJ] Keep for now
   //E_Float transpeed[3]    = {param_real[TransSpeed],param_real[TransSpeed+1],param_real[TransSpeed+2]};
   //E_Float axispnt[3]      = {param_real[AxisPnt],param_real[AxisPnt+1],param_real[AxisPnt+2]};
@@ -590,6 +596,9 @@ E_Int K_CONNECTOR::setIBCTransfersCommonVar2(
   E_Float* alphasbeta_linePtr = NULL;
   E_Float* index_linePtr      = NULL;
 
+  E_Int nvars    = vectOfDnrFields.size(); //moved to this location as it is needed for WM LES Linearized
+  E_Int nvarsRcv = vectOfRcvFields.size(); //moved to this location as it is needed for WM LES Linearized
+
   // SA WL
   E_Float BbarSA_WL  = 5.03339088;
   E_Float a1SA_WL    = 8.14822158;
@@ -603,20 +612,44 @@ E_Int K_CONNECTOR::setIBCTransfersCommonVar2(
   E_Float nulocal, umod_lin,prt1,prt2,prt3,prt4,grad_linear;
   E_Float prt1SAWL_prime,prt2SAWL_prime,prt3SAWL_prime,prt4SAWL_prime;
 
+  E_Float coefLin = 0.0;
+  E_Float fsLin   = 0.;
+  E_Float* t11Ptr = NULL;
+  E_Float* t12Ptr = NULL;
+  E_Float* t22Ptr = NULL;
+  E_Float* t13Ptr = NULL;
+  E_Float* t23Ptr = NULL;
+  E_Float* t33Ptr = NULL;
+
+
+
   // bctype = 3 for all Musker, SA, MuskerLin, & SALin to avoid adding
   // more bctype conditions in if statements.
   // bctypeLocal will be kept for a flag switch for SA (32), MuskerLin (331), & SALin (332).
   // These are in development and will be added in the near future.
-  E_Int bctypeLocal, linearizeWM;
-  linearizeWM = 0;
+  E_Int bctypeLocal, linearizeWM, linearizeWMLES;
+  linearizeWM    = 0;
+  linearizeWMLES = 0;
   bctypeLocal = bctype;
   if ( bctypeLocal == 32 || bctypeLocal == 331 || bctypeLocal == 332){
     bctype=3;
     if ( bctypeLocal == 331 || bctypeLocal == 332){
       linearizeWM=1;
+      if (nvars==5){
+	linearizeWMLES=1;
+	t11Ptr = densPtr+7*nbRcvPts;
+	t12Ptr = densPtr+8*nbRcvPts;
+	t22Ptr = densPtr+9*nbRcvPts;
+	t13Ptr = densPtr+10*nbRcvPts;
+	t23Ptr = densPtr+11*nbRcvPts;
+	t33Ptr = densPtr+12*nbRcvPts;
+
+	coefLin = 0.0;
+	fsLin   = 0.;
+      }
     }
   }
-
+  
   if (motionType==3){
     E_Int shift_var=0;
     // log, Musker, TBLE, MuskerMob, Pohlhausen, Thwaites - also have utau & yplus - need the shift
@@ -754,9 +787,6 @@ E_Int K_CONNECTOR::setIBCTransfersCommonVar2(
   E_Float cc               = 5.2; //pour la loi log
   E_Float one_third        = 1./3.;
   /* fin parametres loi de parois*/
-
-  E_Int nvars    = vectOfDnrFields.size();
-  E_Int nvarsRcv = vectOfRcvFields.size();
 
   E_Float a0,a1,a2,b0,b1,b2,n0,n1,n2;
   E_Float t0,t1,t2;
@@ -1076,14 +1106,11 @@ E_Int K_CONNECTOR::setIBCTransfersCommonVar2(
 	      tOut[indR]     = tcible_vec[noind];
 	      varSAOut[indR] = aa_vec[noind]*sign_vec[noind]*uext_vec[noind];  //nutilde*signibc
 
-# include "IBC/commonIBCmotionRel2Abs.h"  
-
+# include "IBC/commonIBCmotionRel2Abs.h"
+	      	     
 	      vxPtr[noind+ideb] = uOut[indR];
 	      vyPtr[noind+ideb] = vOut[indR];
 	      vzPtr[noind+ideb] = wOut[indR];
-
-	      
-
 	      // printf("OUT WALL LAW: %f %f %f %f\n",uOut[indR],vOut[indR],wOut[indR],varSAOut[indR]);
 	    }
 	}
@@ -1108,7 +1135,9 @@ E_Int K_CONNECTOR::setIBCTransfersCommonVar2(
 	      wOut[indR]     = wcible_vec[noind];
 	      tOut[indR]     = tcible_vec[noind];
 
-# include "IBC/commonIBCmotionRel2Abs.h"  
+# include "IBC/commonIBCmotionRel2Abs.h"
+	      // WMLES - Kawai & Tamaki 2021 - see notes @ header
+# include "IBC/commonWMLESLin_tijModel.h"
 
 	      vxPtr[noind+ideb] = uOut[indR];
 	      vyPtr[noind+ideb] = vOut[indR];
@@ -2629,6 +2658,8 @@ E_Int K_CONNECTOR::setIBCTransfersCommonVar3(
   if ( bctypeLocal == 32 || bctypeLocal == 331 || bctypeLocal == 332){
     bctype=3;
   }
+  bctypeLocal = bctype;
+  //IMPORTANT NOTE:: currently hard coded for Musker only
   
   // if ( (bctype==2 || (bctype==3)) && nvars < 6)
   // {
@@ -5292,17 +5323,21 @@ PyObject* K_CONNECTOR::_WM_getVal2tc(PyObject* self, PyObject* args)
   PyObject *pyVariables;
   PyObject *pyIndRcv;
   PyObject *pyArrayDensWM, *pyArrayVelXWM, *pyArrayVelYWM, *pyArrayVelZWM, *pyArrayTempWM, *pyArraySaNuWM;
-  E_Int     loc,nvars;
+  E_Int     loc, nvars, WMvsWMLESLin;
   char* GridCoordinates; char* FlowSolutionNodes; char* FlowSolutionCenters;
 
   if (!PYPARSETUPLE_(args,
-                    OOOO_ OOOO_ O_ II_ SSS_,
+                    OOOO_ OOOO_ O_ III_ SSS_,
                     &zoneR, &pyVariables, &pyIndRcv, 
                     &pyArrayDensWM, &pyArrayVelXWM, &pyArrayVelYWM, &pyArrayVelZWM, &pyArrayTempWM, &pyArraySaNuWM,
-                    &loc,&nvars,
-                    &GridCoordinates,  &FlowSolutionNodes, &FlowSolutionCenters)){
+		    &loc, &nvars, &WMvsWMLESLin,
+		    &GridCoordinates,  &FlowSolutionNodes, &FlowSolutionCenters)){
     return NULL;
   }
+
+
+  // reusing this routine for the WMLES Linearization of Kawai and Tamaki of 2021.
+  // dens = t11 | velx = t12 | vely = t22 | velz = t13 | temp = t23 | sanu = t33
 
   vector<PyArrayObject*> hook;
 
@@ -5350,7 +5385,8 @@ PyObject* K_CONNECTOR::_WM_getVal2tc(PyObject* self, PyObject* args)
 
   if  (loc==0) { solR = K_PYTREE::getNodeFromName1(zoneR , "FlowSolution"        ); }
   else  { solR = K_PYTREE::getNodeFromName1(zoneR , "FlowSolution#Centers"); }
-  t = K_PYTREE::getNodeFromName1(solR, "Density_WM");
+  if (WMvsWMLESLin==1){      t = K_PYTREE::getNodeFromName1(solR, "Density_WM");}
+  else if (WMvsWMLESLin==2){ t = K_PYTREE::getNodeFromName1(solR, "t11_model");}
   iptroR = K_PYTREE::getValueAF(t, hook);
 
   // get type
@@ -5394,24 +5430,41 @@ PyObject* K_CONNECTOR::_WM_getVal2tc(PyObject* self, PyObject* args)
     else { ideb = (chunk+1)*r+(ithread-r-1)*chunk; ifin = ideb + chunk; }
 
 
+    if (WMvsWMLESLin==1){
 #ifdef _OPENMP4
 #pragma omp simd
 #endif
-    for (E_Int noind = 0; noind < ifin-ideb; noind++){
-      E_Int indR = rcvPts[noind+ideb];
-      dens[noind+ideb] = vectOfRcvFields[0][indR];
-      velx[noind+ideb] = vectOfRcvFields[1][indR];
-      vely[noind+ideb] = vectOfRcvFields[2][indR];
-      velz[noind+ideb] = vectOfRcvFields[3][indR];
-      temp[noind+ideb] = vectOfRcvFields[4][indR];
-    }
-    if (nvars==6){
       for (E_Int noind = 0; noind < ifin-ideb; noind++){
 	E_Int indR = rcvPts[noind+ideb];
-	sanu[noind+ideb] = vectOfRcvFields[5][indR];
+	dens[noind+ideb] = vectOfRcvFields[0][indR];
+	velx[noind+ideb] = vectOfRcvFields[1][indR];
+	vely[noind+ideb] = vectOfRcvFields[2][indR];
+	velz[noind+ideb] = vectOfRcvFields[3][indR];
+	temp[noind+ideb] = vectOfRcvFields[4][indR];
+      }
+      if (nvars==6){
+	for (E_Int noind = 0; noind < ifin-ideb; noind++){
+	  E_Int indR = rcvPts[noind+ideb];
+	  sanu[noind+ideb] = vectOfRcvFields[5][indR];
+	}
       }
     }
-		 
+    else{
+#ifdef _OPENMP4
+#pragma omp simd
+#endif
+      for (E_Int noind = 0; noind < ifin-ideb; noind++){
+	E_Int indR = rcvPts[noind+ideb];
+	vectOfRcvFields[0][indR] = dens[noind+ideb];
+	vectOfRcvFields[1][indR] = velx[noind+ideb];
+	vectOfRcvFields[2][indR] = vely[noind+ideb];
+	vectOfRcvFields[3][indR] = velz[noind+ideb];
+	vectOfRcvFields[4][indR] = temp[noind+ideb];
+	vectOfRcvFields[5][indR] = sanu[noind+ideb];
+      }
+    }
+    
+
   } // Fin zone // omp
   // sortie
   RELEASESHAREDZ(hook, (char*)NULL, (char*)NULL);
@@ -5427,7 +5480,6 @@ PyObject* K_CONNECTOR::_WM_getVal2tc(PyObject* self, PyObject* args)
   Py_INCREF(Py_None);
   return Py_None;
 }
-
 //=============================================================================
 // Set the value at the target points in the tc (local) into the real tc (as in the tree itself)
 //=============================================================================
