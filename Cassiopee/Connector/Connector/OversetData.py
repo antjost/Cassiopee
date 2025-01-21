@@ -475,7 +475,7 @@ def _setIBCDataForZone__(z, zonesDnr, correctedPts, wallPts, interpPts, loc='nod
         nbinterpolated = nbinterpolated0-nbextrapolated-nborphan
 
         if bcType != -1:
-            print('IBC zone %s: interpolated=%d; extrapolated=%d; orphan=%d for IBC type: %s'%(z[0],nbinterpolated,nbextrapolated,nborphan, IBCTypes[bcType]))
+            print('IBC zone %s: interpolated=%d; extrapolated=%d; orphan=%d for IBC type: %s'%(z[0],nbinterpolated,nbextrapolated,nborphan, IBCTypes[bcType-1000] if bcType>500 else IBCTypes[bcType]))
         else:
             print('IBC zone %s: interpolated=%d; extrapolated=%d; orphan=%d '%(z[0],nbinterpolated,nbextrapolated,nborphan))
 
@@ -645,7 +645,7 @@ def _setIBCDataForZone2__(z, zonesDnr, correctedPts, wallPts, interpPts, interpP
         nbinterpolated = nbinterpolated0-nbextrapolated-nborphan
 
         if bcType != -1:
-            print('IBC zone %s: interpolated=%d; extrapolated=%d; orphan=%d for IBC type: %s'%(z[0],nbinterpolated,nbextrapolated,nborphan, IBCTypes[bcType]))
+            print('IBC zone %s: interpolated=%d; extrapolated=%d; orphan=%d for IBC type: %s'%(z[0],nbinterpolated,nbextrapolated,nborphan, IBCTypes[bcType-1000] if bcType>500 else IBCTypes[bcType]))
         else:
             print('IBC zone %s: interpolated=%d; extrapolated=%d; orphan=%d '%(z[0],nbinterpolated,nbextrapolated,nborphan))
 
@@ -762,7 +762,7 @@ def _setIBCDataForZone2__(z, zonesDnr, correctedPts, wallPts, interpPts, interpP
         nbinterpolated = nbinterpolated0-nbextrapolated-nborphan
 
         if bcType != -1:
-            print('2nd Front : IBC zone %s: interpolated=%d; extrapolated=%d; orphan=%d for IBC type: %s'%(z[0],nbinterpolated,nbextrapolated,nborphan, IBCTypes[bcType]))
+            print('2nd Front : IBC zone %s: interpolated=%d; extrapolated=%d; orphan=%d for IBC type: %s'%(z[0],nbinterpolated,nbextrapolated,nborphan, IBCTypes[bcType-1000] if bcType>500 else IBCTypes[bcType]))
         else:
             print('2nd Front : IBC zone %s: interpolated=%d; extrapolated=%d; orphan=%d '%(z[0],nbinterpolated,nbextrapolated,nborphan))
 
@@ -1011,7 +1011,7 @@ def _addIBCCoords__(z, zname, correctedPts, wallPts, interpolatedPts, bcType, bc
         zsr[2].append(['CoordinateZ_PW#Init',coordsPW[1][2,:], [], 'DataArray_t'])
 
         motionTypeLocal = numpy.ones((nIBC),numpy.float64)
-        zsr[2].append(['MotionType'   ,  Internal.getNodeFromName(timeMotion,'MotionType')[1][0]*motionTypeLocal, [], 'DataArray_t'])
+        zsr[2].append(['omega'        ,  Internal.getNodeFromName(timeMotion,'omega')[1][0]*motionTypeLocal, [], 'DataArray_t'])
 
         zsr[2].append(['transl_speedX',  Internal.getNodeFromName(timeMotion,'transl_speed')[1][0]*motionTypeLocal, [], 'DataArray_t'])
         zsr[2].append(['transl_speedY',  Internal.getNodeFromName(timeMotion,'transl_speed')[1][1]*motionTypeLocal, [], 'DataArray_t'])
@@ -1025,7 +1025,7 @@ def _addIBCCoords__(z, zname, correctedPts, wallPts, interpolatedPts, bcType, bc
         zsr[2].append(['axis_vctY'    ,  Internal.getNodeFromName(timeMotion,'axis_vct')[1][1]*motionTypeLocal, [], 'DataArray_t'])
         zsr[2].append(['axis_vctZ'    ,  Internal.getNodeFromName(timeMotion,'axis_vct')[1][2]*motionTypeLocal, [], 'DataArray_t'])
 
-        zsr[2].append(['omega'        ,  Internal.getNodeFromName(timeMotion,'omega')[1][0]*motionTypeLocal, [], 'DataArray_t'])
+
 
 
     if bcName is not None:

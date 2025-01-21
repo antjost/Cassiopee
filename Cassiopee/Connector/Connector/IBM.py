@@ -2404,7 +2404,11 @@ def getAllIBMPoints(t, loc='nodes', hi=0., he=0., tb=None, tfront=None, frontTyp
             if famName is not None:
                 famName = Internal.getValue(famName)
 
-            ibctypeI = TypesOfIBC[ibctype]
+            ibctypeIadd=0
+            timeMotion = Internal.getNodeByName(z,'TimeMotion')
+            if timeMotion: ibctypeIadd=1000
+            
+            ibctypeI = TypesOfIBC[ibctype]+ibctypeIadd
             if famName is not None: ibctype2 = str(ibctypeI)+"#"+famName
             else: ibctype2 = str(ibctypeI)
             if ibctype2 not in dictOfBodiesByIBCType: dictOfBodiesByIBCType[ibctype2]=[s]

@@ -503,13 +503,7 @@ E_Int K_CONNECTOR::setIBCTransfersCommonVar2(
 
 
   E_Int bctypeLocal; 
-  int   motionType      = (int) param_real[MotionType];
-  //[AJ] Keep for now
-  //E_Float transpeed[3]    = {param_real[TransSpeed],param_real[TransSpeed+1],param_real[TransSpeed+2]};
-  //E_Float axispnt[3]      = {param_real[AxisPnt],param_real[AxisPnt+1],param_real[AxisPnt+2]};
-  //E_Float axisvec[3]      = {param_real[AxisVec],param_real[AxisVec+1],param_real[AxisVec+2]};
-  //E_Float omg             = param_real[OMG];  
-
+  E_Int motionType     = 0;
   E_Float cmx,cmy,cmz;
   E_Float kvcmx,kvcmy,kvcmz;
   E_Float tmp_x,tmp_y,tmp_z;
@@ -551,7 +545,6 @@ E_Int K_CONNECTOR::setIBCTransfersCommonVar2(
   E_Float* gradyWPtr = NULL;
   E_Float* gradzWPtr = NULL;
 
-  E_Float* motionPtr   = NULL;
   E_Float* transpeedPtrX = NULL;
   E_Float* transpeedPtrY = NULL;
   E_Float* transpeedPtrZ = NULL;
@@ -581,14 +574,16 @@ E_Int K_CONNECTOR::setIBCTransfersCommonVar2(
   if ( bctypeLocal == 32 || bctypeLocal == 331 || bctypeLocal == 332){
     bctype=3;
   }
+  else if(bctypeLocal>500){
+    bctype=bctypeLocal-1000;
+    motionType=3;
+  }
   
   if (motionType==3){
     E_Int shift_var=0;
     // log, Musker, TBLE, MuskerMob, Pohlhausen, Thwaites - also have utau & yplus - need the shift
     if (bctype == 2 || bctype == 3 || bctype == 6 || bctype == 7 || bctype == 8 || bctype == 9) shift_var=2;
-      
-    motionPtr    =densPtr + (14+shift_var)*nbRcvPts;
-
+    omgPtr       =densPtr + (14+shift_var)*nbRcvPts;
     transpeedPtrX=densPtr + (15+shift_var)*nbRcvPts;
     transpeedPtrY=densPtr + (16+shift_var)*nbRcvPts;
     transpeedPtrZ=densPtr + (17+shift_var)*nbRcvPts;
@@ -601,7 +596,7 @@ E_Int K_CONNECTOR::setIBCTransfersCommonVar2(
     axisvecPtrY=densPtr + (22+shift_var)*nbRcvPts;
     axisvecPtrZ=densPtr + (23+shift_var)*nbRcvPts;
 
-    omgPtr     =densPtr + (24+shift_var)*nbRcvPts;
+    
   }
 
   if (bctype == 11)

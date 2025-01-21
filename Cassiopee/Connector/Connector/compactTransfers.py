@@ -179,6 +179,16 @@ def miseAPlatDonorTree__(zones, tc, graph=None, list_graph=None, nbpts_linelets=
                 Nbpts_InterpD =  numpy.shape(InterpD[ 1  ])[0]
 
                 sname        = s[0][0:2]
+                utau         = Internal.getNodeFromName1(s, 'utau')
+                temp_local   = Internal.getNodeFromName1(s, 'Temperature')
+                wmodel_local = Internal.getNodeFromName1(s, 'Density_WM')
+                gradxP       = Internal.getNodeFromName1(s, 'gradxPressure')
+                gradxU       = Internal.getNodeFromName1(s, 'gradxVelocityX')
+                xcInit       = Internal.getNodeFromName1(s, 'CoordinateX_PC#Init')
+                motion_type  = Internal.getNodeFromName1(s, 'omega')
+                kcurv        = Internal.getNodeFromName1(s, XOD.__KCURV__)
+                sd1          = Internal.getNodeFromName1(s, 'StagnationEnthalpy')
+                yline        = Internal.getNodeFromName1(s, 'CoordinateN_ODE')
 
                 #recherche raccord conservatif
                 zd = zones[c]
@@ -260,7 +270,7 @@ def miseAPlatDonorTree__(zones, tc, graph=None, list_graph=None, nbpts_linelets=
                 if gradxP is not None: ntab_IBC += 3
                 if gradxU is not None: ntab_IBC += 9
                 if xcInit is not None: ntab_IBC += 9 # 3 for each type IBM point - 3 wall points, 3 target points, & 3 image points
-                if motion_type is not None: ntab_IBC += 11 #MotionType,transl_speed(x3),axis_pnt(x3),axis_vct(x3),omega
+                if motion_type is not None: ntab_IBC += 10 #omega,transl_speed(x3),axis_pnt(x3),axis_vct(x3)
                 if kcurv is not None: ntab_IBC += 1
                 if sd1 is not None: ntab_IBC += 5
                 if yline is not None: ntab_IBC += (7*nbpts_linelets+2)
@@ -576,12 +586,10 @@ def miseAPlatDonorTree__(zones, tc, graph=None, list_graph=None, nbpts_linelets=
         transl_speedX=None;transl_speedY=None;transl_speedZ=None;
         axis_pntX=None;axis_pntY=None;axis_pntZ=None;
         axis_vctX=None;axis_vctY=None;axis_vctZ=None;
-        omega=None;
         ptmotion_type=0;
         pttransl_speedX=0;pttransl_speedY=0;pttransl_speedZ=0;
         ptaxis_pntX=0;ptaxis_pntY=0;ptaxis_pntZ=0;
         ptaxis_vctX=0;ptaxis_vctY=0;ptaxis_vctZ=0;
-        ptomega=0;
 
         sd1=None;sd2=None;sd3=None;sd4=None;sd5=None
         ptd1=0;ptd2=0;ptd3=0;ptd4=0;ptd5=0
@@ -757,7 +765,7 @@ def miseAPlatDonorTree__(zones, tc, graph=None, list_graph=None, nbpts_linelets=
                 ptzwInit = pt_coef + Nbpts_InterpD + Nbpts_D*(inc+8)
                 size_IBC   += 9*Nbpts_D; inc += 9
 
-            motion_type  = Internal.getNodeFromName1(s , 'MotionType')
+            motion_type   = Internal.getNodeFromName1(s , 'omega')
             transl_speedX = Internal.getNodeFromName1(s , 'transl_speedX')
             transl_speedY = Internal.getNodeFromName1(s , 'transl_speedY')
             transl_speedZ = Internal.getNodeFromName1(s , 'transl_speedZ')
@@ -767,7 +775,6 @@ def miseAPlatDonorTree__(zones, tc, graph=None, list_graph=None, nbpts_linelets=
             axis_vctX     = Internal.getNodeFromName1(s , 'axis_vctX')
             axis_vctY     = Internal.getNodeFromName1(s , 'axis_vctY')
             axis_vctZ     = Internal.getNodeFromName1(s , 'axis_vctZ')
-            omega        = Internal.getNodeFromName1(s , 'omega')
             if motion_type is not None:
                 ptmotion_type   = pt_coef + Nbpts_InterpD + Nbpts_D*(inc+0)
                 pttransl_speedX = pt_coef + Nbpts_InterpD + Nbpts_D*(inc+1)
@@ -779,8 +786,7 @@ def miseAPlatDonorTree__(zones, tc, graph=None, list_graph=None, nbpts_linelets=
                 ptaxis_vctX     = pt_coef + Nbpts_InterpD + Nbpts_D*(inc+7)
                 ptaxis_vctY     = pt_coef + Nbpts_InterpD + Nbpts_D*(inc+8)
                 ptaxis_vctZ     = pt_coef + Nbpts_InterpD + Nbpts_D*(inc+9)
-                ptomega         = pt_coef + Nbpts_InterpD + Nbpts_D*(inc+10)
-                size_IBC   += 11*Nbpts_D; inc += 11
+                size_IBC   += 10*Nbpts_D; inc += 10
 
             sd1 = Internal.getNodeFromName1(s, 'StagnationEnthalpy')
             if sd1 is not None:
@@ -934,7 +940,6 @@ def miseAPlatDonorTree__(zones, tc, graph=None, list_graph=None, nbpts_linelets=
                         pttransl_speedX,pttransl_speedY,pttransl_speedZ,
                         ptaxis_pntX,ptaxis_pntY,ptaxis_pntZ,
                         ptaxis_vctX,ptaxis_vctY,ptaxis_vctZ,
-                        ptomega,
                         ptd1,ptd2,ptd3,ptd4,ptd5,
                         ptyline,ptuline,ptnutildeline,ptpsiline,ptmatmline,ptmatline,ptmatpline,
                         ptalphasbetaline,ptindexline,
@@ -954,7 +959,6 @@ def miseAPlatDonorTree__(zones, tc, graph=None, list_graph=None, nbpts_linelets=
                         transl_speedX,transl_speedY,transl_speedZ,
                         axis_pntX,axis_pntY,axis_pntZ,
                         axis_vctX,axis_vctY,axis_vctZ,
-                        omega,
                         sd1,sd2,sd3,sd4,sd5,
                         yline,uline,nutildeline,psiline,matmline,matline,matpline,
                         alphasbetaline,indexline,
@@ -978,7 +982,6 @@ def miseAPlatDonorTree__(zones, tc, graph=None, list_graph=None, nbpts_linelets=
                          pttransl_speedX,pttransl_speedY,pttransl_speedZ,
                          ptaxis_pntX,ptaxis_pntY,ptaxis_pntZ,
                          ptaxis_vctX,ptaxis_vctY,ptaxis_vctZ,
-                         ptomega,
                          ptd1,ptd2,ptd3,ptd4,ptd5,
                          ptyline,ptuline,ptnutildeline,ptpsiline,ptmatmline,ptmatline,ptmatpline,
                          ptalphasbetaline,ptindexline,
@@ -998,7 +1001,6 @@ def miseAPlatDonorTree__(zones, tc, graph=None, list_graph=None, nbpts_linelets=
                          transl_speedX,transl_speedY,transl_speedZ,
                          axis_pntX,axis_pntY,axis_pntZ,
                          axis_vctX,axis_vctY,axis_vctZ,
-                         omega,
                          sd1,sd2,sd3,sd4,sd5,
                          yline,uline,nutildeline,psiline,matmline,matline,matpline,
                          alphasbetaline,indexline,
@@ -1095,8 +1097,6 @@ def miseAPlatDonorTree__(zones, tc, graph=None, list_graph=None, nbpts_linelets=
                 axis_vctX     = param_real[ ptaxis_vctX : ptaxis_vctX + Nbpts_D ]
                 axis_vctY     = param_real[ ptaxis_vctY : ptaxis_vctY + Nbpts_D ]
                 axis_vctZ     = param_real[ ptaxis_vctZ : ptaxis_vctZ + Nbpts_D ]
-
-                omega        = param_real[ ptomega : ptomega + Nbpts_D ]
 
             if kcurv is not None:
                 kcurv[1]  = param_real[ ptkcurv : ptkcurv + Nbpts_D ]
@@ -1239,7 +1239,6 @@ def triMultiType(Nbpts_D, Nbpts, Nbpts_InterpD, meshtype, noi, lst,lstD,l0,ctyp,
                  pttransl_speedX,pttransl_speedY,pttransl_speedZ,
                  ptaxis_pntX,ptaxis_pntY,ptaxis_pntZ,
                  ptaxis_vctX,ptaxis_vctY,ptaxis_vctZ,
-                 ptomega,
                  ptd1,ptd2,ptd3,ptd4,ptd5,
                  ptyline,ptuline,ptnutildeline,ptpsiline,ptmatmline,ptmatline,ptmatpline,
                  ptalphasbetaline,ptindexline,
@@ -1259,7 +1258,6 @@ def triMultiType(Nbpts_D, Nbpts, Nbpts_InterpD, meshtype, noi, lst,lstD,l0,ctyp,
                  transl_speedX,transl_speedY,transl_speedZ,
                  axis_pntX,axis_pntY,axis_pntZ,
                  axis_vctX,axis_vctY,axis_vctZ,
-                 omega,
                  sd1,sd2,sd3,sd4,sd5,
                  yline,uline,nutildeline,psiline,matmline,matline,matpline,
                  alphasbetaline,indexline,
@@ -1385,8 +1383,6 @@ def triMultiType(Nbpts_D, Nbpts, Nbpts_InterpD, meshtype, noi, lst,lstD,l0,ctyp,
                         param_real[ ptaxis_vctY     + l + l0 ] = axis_vctY[1][i]
                         param_real[ ptaxis_vctZ     + l + l0 ] = axis_vctZ[1][i]
 
-                        param_real[ ptomega        + l + l0 ] = omega[1][i]
-
 
                     if kcurv is not None:
                         param_real[ ptkcurv + l + l0 ]= kcurv[1][i]
@@ -1462,7 +1458,6 @@ def triMonoType(Nbpts_D, Nbpts, Nbpts_InterpD, meshtype, noi, lst,lstD,l0,ctyp,p
                 pttransl_speedX,pttransl_speedY,pttransl_speedZ,
                 ptaxis_pntX,ptaxis_pntY,ptaxis_pntZ,
                 ptaxis_vctX,ptaxis_vctY,ptaxis_vctZ,
-                ptomega,
                 ptd1,ptd2,ptd3,ptd4,ptd5,
                 ptyline,ptuline,ptnutildeline,ptpsiline,ptmatmline,ptmatline,ptmatpline,
                 ptalphasbetaline,ptindexline,
@@ -1482,7 +1477,6 @@ def triMonoType(Nbpts_D, Nbpts, Nbpts_InterpD, meshtype, noi, lst,lstD,l0,ctyp,p
                 transl_speedX,transl_speedY,transl_speedZ,
                 axis_pntX,axis_pntY,axis_pntZ,
                 axis_vctX,axis_vctY,axis_vctZ,
-                omega,
                 sd1,sd2,sd3,sd4,sd5,
                 yline,uline,nutildeline,psiline,matmline,matline,matpline,
                 alphasbetaline,indexline,
@@ -1592,8 +1586,6 @@ def triMonoType(Nbpts_D, Nbpts, Nbpts_InterpD, meshtype, noi, lst,lstD,l0,ctyp,p
             connector.initNuma(axis_vctY[1]     , param_real, ptaxis_vctY     , Nbpts_D , 0, val)
             connector.initNuma(axis_vctZ[1]     , param_real, ptaxis_vctZ     , Nbpts_D , 0, val)
 
-            connector.initNuma(omega[1]        , param_real, ptomega        , Nbpts_D , 0, val)
-
         if kcurv is not None:
             connector.initNuma(kcurv[1] , param_real, ptkcurv , Nbpts_D , 0, val)
 
@@ -1671,7 +1663,7 @@ def miseAPlatDonorZone__(zones, tc, procDict):
             gradxP       =  Internal.getNodeFromName1(rac, 'gradxPressure')
             gradxU       =  Internal.getNodeFromName1(rac, 'gradxVelocityX')
             xcInit       =  Internal.getNodeFromName1(rac, 'CoordinateX_PC#Init')
-            motion_type  =  Internal.getNodeFromName1(rac, 'MotionType')
+            motion_type  =  Internal.getNodeFromName1(rac, 'omega')
             kcurv        =  Internal.getNodeFromName1(rac, 'KCurv')
             sd1          =  Internal.getNodeFromName1(rac, 'StagnationEnthalpy')
             yline        =  Internal.getNodeFromName1(rac, 'CoordinateN_ODE')
@@ -1684,7 +1676,7 @@ def miseAPlatDonorZone__(zones, tc, procDict):
             if gradxP is not None: ntab_IBC += 3
             if gradxU is not None: ntab_IBC += 9
             if xcInit is not None: ntab_IBC += 9
-            if motion_type is not None: ntab_IBC += 11 #MotionType,transl_speed(x3),axis_pnt(x3),axis_vct(x3),omega
+            if motion_type is not None: ntab_IBC += 10 #omega,transl_speed(x3),axis_pnt(x3),axis_vct(x3)
             if kcurv is not None: ntab_IBC += 1
             if sd1 is not None: ntab_IBC += 5
             if yline is not None: ntab_IBC += (7*nbpts_linelets+2)
@@ -1815,7 +1807,7 @@ def miseAPlatDonorZone__(zones, tc, procDict):
                         var_ibc.append('CoordinateY_PW#Init')
                         var_ibc.append('CoordinateZ_PW#Init')
                     if motion_type is not None:
-                        var_ibc.append('MotionType')
+                        var_ibc.append('omega')
 
                         var_ibc.append('transl_speedX')
                         var_ibc.append('transl_speedY')
@@ -1829,7 +1821,6 @@ def miseAPlatDonorZone__(zones, tc, procDict):
                         var_ibc.append('axis_vctY')
                         var_ibc.append('axis_vctZ')
 
-                        var_ibc.append('omega')
                     if kcurv is not None:
                         var_ibc.append('KCurv')
                     if yline is not None:
@@ -1859,7 +1850,7 @@ def miseAPlatDonorZone__(zones, tc, procDict):
                         var_ibc.append('CoordinateZ_PW#Init')
 
                     if motion_type is not None:
-                        var_ibc.append('MotionType')
+                        var_ibc.append('omega')
 
                         var_ibc.append('transl_speedX')
                         var_ibc.append('transl_speedY')
@@ -1872,8 +1863,6 @@ def miseAPlatDonorZone__(zones, tc, procDict):
                         var_ibc.append('axis_vctX')
                         var_ibc.append('axis_vctY')
                         var_ibc.append('axis_vctZ')
-
-                        var_ibc.append('omega')
 
                 count_ibc = 0
                 ideb      = pt_coef + Nbpts_InterpD
