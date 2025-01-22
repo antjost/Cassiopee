@@ -777,6 +777,31 @@ E_Int K_CONNECTOR::setIBCTransfersCommonVar2(
   //   printf("Warning: setIBCTransfersCommonVar2: number of variables (<6) inconsistent with bctype.\n");
   //   return 0;
   // }
+  E_Int nLocal = ifin-ideb;
+  E_Float velGrid_localAtR[3*nLocal]={0};  
+  E_Float velGrid_localRtA[3*nLocal]={0};
+  if (motionType==3){  
+    for (E_Int noind = 0; noind < ifin-ideb; noind++)
+      {
+	//Abs2Rel
+	tmp_x=xPI[noind+ideb];
+	tmp_y=yPI[noind+ideb];
+	tmp_z=zPI[noind+ideb];
+#include "IBC/motiontype3_velocities.h"
+	velGrid_localAtR[noind         ]=uGrid_local;
+	velGrid_localAtR[noind+  nLocal]=vGrid_local;
+	velGrid_localAtR[noind+2*nLocal]=wGrid_local;
+
+	//Rel2Abs
+	tmp_x=xPC[noind+ideb];
+	tmp_y=yPC[noind+ideb];
+	tmp_z=zPC[noind+ideb];
+#include "IBC/motiontype3_velocities.h"
+	velGrid_localRtA[noind         ]=uGrid_local;
+	velGrid_localRtA[noind+  nLocal]=vGrid_local;
+	velGrid_localRtA[noind+2*nLocal]=wGrid_local;	
+      }
+  } 
 
   if (bctype == 100)//wallslip + curvature radius
     {
@@ -819,7 +844,6 @@ E_Int K_CONNECTOR::setIBCTransfersCommonVar2(
 	  v = vOut[indR];
 	  w = wOut[indR];
 
-	  //[AJ]
 # include "IBC/commonIBCmotionAbs2Rel.h"  
 	  
 # include "IBC/commonBCType0.h"
@@ -828,7 +852,6 @@ E_Int K_CONNECTOR::setIBCTransfersCommonVar2(
 	  vOut[indR] = vcible;
 	  wOut[indR] = wcible;
 
-	  //[AJ]
 # include "IBC/commonIBCmotionRel2Abs.h"
 	  
 	  if (nvars == 6) varSAOut[indR] = varSAOut[indR]*alphasbeta;
@@ -855,7 +878,6 @@ E_Int K_CONNECTOR::setIBCTransfersCommonVar2(
 	  v = vOut[indR];
 	  w = wOut[indR];
 
-	  //[AJ]
 # include "IBC/commonIBCmotionAbs2Rel.h"  	    
 
 # include "IBC/commonBCType1.h"
@@ -864,7 +886,6 @@ E_Int K_CONNECTOR::setIBCTransfersCommonVar2(
 	  vOut[indR] = vcible;
 	  wOut[indR] = wcible;
 
-	  //[AJ]
 # include "IBC/commonIBCmotionRel2Abs.h"
 
 	  if (nvars == 6) varSAOut[indR] = varSAOut[indR]*alphasbeta;
