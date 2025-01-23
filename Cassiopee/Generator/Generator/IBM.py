@@ -708,10 +708,11 @@ def generateIBMMesh(tb, dimPb=3, vmin=15, snears=0.01, dfars=10., dfarDir=0,
     tbOneOver   = None
     tbF1        = None
     if tbox:
+        tbRM        = Internal.getNodesFromNameAndType(tbox, '*RM*'     , 'CGNSBase_t')
         tbOneOver   = Internal.getNodesFromNameAndType(tbox, '*OneOver*', 'CGNSBase_t')
         tbF1        = Internal.getNodesFromNameAndType(tbox, '*KeepF1*' , 'CGNSBase_t')
         tbOneOverF1 = tbOneOver+tbF1
-        tbox        = Internal.rmNodesByName(Internal.rmNodesByName(tbox, '*OneOver*'), '*KeepF1*')
+        tbox        = Internal.rmNodesByName(Internal.rmNodesByName(Internal.rmNodesByName(tbox, '*OneOver*'), '*KeepF1*'), '*RM*')
         if len(Internal.getBases(tbox))==0: tbox=None
 
     # Octree identical on all procs
@@ -767,6 +768,18 @@ def generateIBMMesh(tb, dimPb=3, vmin=15, snears=0.01, dfars=10., dfarDir=0,
             to = X.blankCellsTri(to, bodies, BM2, blankingType='center_in', cellNName='cellN')
             to = P.selectCells(to,'{centers:cellN}>0.')
             o = Internal.getZones(to)[0]
+
+    if tbRM:
+        to     = C.newPyTree(["OCTREE",o])
+        bodies = [Internal.getZones(tbRM)]
+        BM2    = numpy.ones((2,1),dtype=Internal.E_NpyInt)
+        if dimPb ==2:
+            XRAYDIM1 = 20000; XRAYDIM2 = XRAYDIM1
+            to = X.blankCells(to, bodies, BM2, blankingType='node_in', XRaydim1=XRAYDIM1, XRaydim2=XRAYDIM2, dim=dimPb, cellNName='cellN')
+        else:
+            to = X.blankCellsTri(to, bodies, BM2, blankingType='node_in', cellNName='cellN')
+        to = P.selectCells(to,'{cellN}>0.',strict=1)
+        o = Internal.getZones(to)[0]
 
     if Cmpi.rank==0 and check: C.convertPyTree2File(o, 'octree.cgns')
 
