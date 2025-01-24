@@ -692,7 +692,7 @@ def buildParentOctrees__(o, tb, dimPb=3, vmin=15, snears=0.01, snearFactor=1., d
 # main function
 def generateIBMMesh(tb, dimPb=3, vmin=15, snears=0.01, dfars=10., dfarDir=0,
                     tbox=None, snearsf=None, check=False, to=None,
-                    ext=2, expand=3, octreeMode=0):
+                    ext=2, expand=3, octreeMode=0, sizeMax=1000000):
     """Generates the full Cartesian mesh for IBMs."""
     import KCore.test as test
     # refinementSurfFile: surface meshes describing refinement zones
@@ -707,6 +707,7 @@ def generateIBMMesh(tb, dimPb=3, vmin=15, snears=0.01, dfars=10., dfarDir=0,
     tbOneOverF1 = None
     tbOneOver   = None
     tbF1        = None
+    tbRM        = None
     if tbox:
         tbRM        = Internal.getNodesFromNameAndType(tbox, '*RM*'     , 'CGNSBase_t')
         tbOneOver   = Internal.getNodesFromNameAndType(tbox, '*OneOver*', 'CGNSBase_t')
@@ -770,9 +771,10 @@ def generateIBMMesh(tb, dimPb=3, vmin=15, snears=0.01, dfars=10., dfarDir=0,
             o = Internal.getZones(to)[0]
 
     if tbRM:
-        to     = C.newPyTree(["OCTREE",o])
-        bodies = [Internal.getZones(tbRM)]
-        BM2    = numpy.ones((2,1),dtype=Internal.E_NpyInt)
+        to       = C.newPyTree(["OCTREE",o])
+        bodies   = [Internal.getBases(tbRM)]
+        nBasesRM = len(bodies)
+        BM2      = numpy.ones((2,nBasesRM),dtype=Internal.E_NpyInt)
         if dimPb ==2:
             XRAYDIM1 = 20000; XRAYDIM2 = XRAYDIM1
             to = X.blankCells(to, bodies, BM2, blankingType='node_in', XRaydim1=XRAYDIM1, XRaydim2=XRAYDIM2, dim=dimPb, cellNName='cellN')
@@ -791,7 +793,7 @@ def generateIBMMesh(tb, dimPb=3, vmin=15, snears=0.01, dfars=10., dfarDir=0,
     del o
 
     # fill vmin + merge in parallel
-    res = octree2StructLoc__(p, vmin=vmin, ext=-1, optimized=0, parento=parento, sizeMax=1000000, tbOneOver=tbOneOverF1)
+    res = octree2StructLoc__(p, vmin=vmin, ext=-1, optimized=0, parento=parento, sizeMax=sizeMax, tbOneOver=tbOneOverF1)
     del p
     if parento is not None:
         for po in parento: del po
