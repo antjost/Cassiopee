@@ -570,13 +570,13 @@ E_Int K_CONNECTOR::setIBCTransfersCommonVar2(
   // more bctype conditions in if statements.
   // bctypeLocal will be kept for a flag switch for SA (32), MuskerLin (331), & SALin (332).
   // These are in development and will be added in the near future.
-  bctypeLocal = bctype;
+  if(bctype>500){
+    bctype=bctype-1000;
+    motionType=3;
+  }
+  bctypeLocal = bctype;  
   if ( bctypeLocal == 32 || bctypeLocal == 331 || bctypeLocal == 332){
     bctype=3;
-  }
-  else if(bctypeLocal>500){
-    bctype=bctypeLocal-1000;
-    motionType=3;
   }
   
   if (motionType==3){
