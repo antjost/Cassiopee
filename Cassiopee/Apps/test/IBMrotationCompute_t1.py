@@ -199,6 +199,16 @@ Internal._rmNodesByName(tc, '.Solver#Param')
 Internal._rmNodesByName(tc, '.Solver#ownData')
 Internal._rmNodesFromName(tc, 'Parameter_int')
 Internal._rmNodesFromName(tc, 'Parameter_real')
+
+for z in Internal.getZones(tc):
+    subz = Internal.getNodesFromType(z, 'ZoneSubRegion_t')
+    for z2 in subz:
+        if z2[0][0:2]=='IB':
+            zname = z2[0].split("_")
+            zname[1]=str(int(zname[1])-1000)
+            z2[0]='_'.join(zname)
+
+
 test.testT(t,1)
 test.testT(tc,2)
 
