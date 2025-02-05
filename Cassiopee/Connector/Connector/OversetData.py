@@ -425,7 +425,7 @@ def _setIBCData(aR, aD, order=2, penalty=0, nature=0,
                     zonesDnr.pop(cL); nzonesDnr = nzonesDnr-1
             if  correctedPts[nozr] != []:
                 _setIBCDataForZone__(z, zonesDnr, correctedPts[nozr], wallPts[nozr], interpPts[nozr], loc=locR, order=order, penalty=penalty,nature=nature,method=method,\
-                                     storage=storage, interpDataType=interpDataType, hook=hook, dim=dim, ReferenceState=ReferenceState, bcType=bcType,model=model)
+                                     storage=storage, interpDataType=interpDataType, hook=hook, dim=dim, ReferenceState=ReferenceState, bcType=bcType, model=model)
 
     # fin parcours des zones receveuses
     for zd in Internal.getZones(aD):
@@ -916,7 +916,7 @@ def _addIBCCoords__(z, zname, correctedPts, wallPts, interpolatedPts, bcType, bc
     zsr[2].append(['VelocityX' , vxNP , [], 'DataArray_t'])
     zsr[2].append(['VelocityY' , vyNP , [], 'DataArray_t'])
     zsr[2].append(['VelocityZ' , vzNP , [], 'DataArray_t'])
-
+    if bcType>500: bcType-=1000
     if bcType in [2, 3, 6, 7, 8, 9, 10, 11, 33]:
         utauNP  = numpy.zeros((nIBC),numpy.float64)
         yplusNP = numpy.zeros((nIBC),numpy.float64)
