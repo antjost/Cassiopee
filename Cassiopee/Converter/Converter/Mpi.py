@@ -327,13 +327,15 @@ def trace(text=">>> IN XXX: ", cpu=None, mem=None, reset=False, fileName=None, m
         msg += ' [%g hr %g min %g sec]'%(hours, minutes, seconds)
     if TRACESTATE['mem']:
         if peak == -1: # peak is not known
-            if tot > 1.e6: msg += '[%f GB]'%(tot/1.e6)
-            elif tot > 1000.: msg += '[%f MB]'%(tot/1000.)
-            else: msg += '[%f kB]'%(tot)
+            #if tot > 1.e6: msg += '[%f GB]'%(tot/1.e6)
+            #elif tot > 1000.: msg += '[%f MB]'%(tot/1000.)
+            #else: msg += '[%f kB]'%(tot)
+            msg += '[%f MB]'%(tot/1000.)
         else:
-            if tot > 1.e6: msg += '[current: %f GB | peak: %f GB]'%(tot/1.e6, peak/1.e6)
-            elif tot > 1000.: msg += '[current: %f MB | peak: %f MB]'%(tot/1000., peak/1000.)
-            else: msg += '[current: %f kB | peak: %f kB]'%(tot, peak)
+            #if tot > 1.e6: msg += '[current: %f GB | peak: %f GB]'%(tot/1.e6, peak/1.e6)
+            #elif tot > 1000.: msg += '[current: %f MB | peak: %f MB]'%(tot/1000., peak/1000.)
+            #else: msg += '[current: %f kB | peak: %f kB]'%(tot, peak)
+            msg += '[current: %f MB | peak: %f MB]'%(tot/1000., peak/1000.)
     msg += '\n'
 
     if TRACESTATE['fileName'] == "stdout":
