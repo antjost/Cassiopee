@@ -7,9 +7,27 @@ import Dist2Walls.PyTree as DTW
 import Post.PyTree as P
 import XCore.PyTree as XC
 from . import PyTree as G
-import os, numpy, math, time
-
+import os, numpy, math, time, gc, sys
 __TOL__ = 1.0e-9
+isCheckMemory = False
+isCheckMemory2= False
+
+def activeVarsLocal(active_vars,FunctionName):
+    from pympler import asizeof
+    print('Function name:%s'%FunctionName)
+    print("# of variables still bound in function scope: %d"%len(active_vars.items()), flush=True)
+    #for name, value in active_vars.items():
+    #    print(f" - {name}: {type(value).__name__} (size: {sys.getsizeof(value)} bytes)", flush=True)
+    for var_name, var_val in active_vars.items():
+        if not var_name.startswith('__'):
+            size_mb = asizeof.asizeof(var_val) / (1024 * 1024)
+            print(f"{var_name:<20} | {type(var_val).__name__:<15} | {size_mb:.2f} MB")
+    # 2. Clear all internal references inside the dict first
+    active_vars.clear()
+
+    # 3. Now delete the variable name
+    del active_vars
+    return None
 
 #==================================================================
 # Helper functions for input geometry tree (tb)
@@ -330,6 +348,12 @@ def generateListOfOffsets__(tb, snears, offsetValues=[], dim=3, opt=False, nboxe
             if node: listShiftBase.append(b[0])
         tb = Internal.rmNodesByNameAndType(tb, '*_sym*', 'Zone_t')
 
+    if isCheckMemory:
+        active_vars = None; del active_vars; active_vars = locals()
+        activeVarsLocal(active_vars, FunctionName='generate_list_offset_1')
+        Cmpi.trace("generate_list_offset_1", master=True, method=1)
+        Cmpi.trace("generate_list_offset_1", master=True, method=0)
+
     nbases = len(Internal.getBases(tb))
     if opt and dim == 3:
         _autoRemeshGeom__(tb)
@@ -382,6 +406,12 @@ def generateListOfOffsets__(tb, snears, offsetValues=[], dim=3, opt=False, nboxe
             elif dir_sym == 2: ymin_core += delta2
             elif dir_sym == 3: zmin_core += delta2
 
+        if isCheckMemory:
+            active_vars = None; del active_vars; active_vars = locals()
+            activeVarsLocal(active_vars, FunctionName='generate_list_offset_BeforeCartX')
+            Cmpi.trace("generate_list_offset_BeforeCartX", master=True, method=1)
+            Cmpi.trace("generate_list_offset_BeforeCartX", master=True, method=0)
+
         # CartRx: smaller and finer Cartesian core, bigger geometric factor
         XF0 = (xmin, ymin, zmin)
         XF1 = (xmax, ymax, zmax)
@@ -390,6 +420,13 @@ def generateListOfOffsets__(tb, snears, offsetValues=[], dim=3, opt=False, nboxe
         H = (h_core, h_core, h_core)
         R = (1.3, 1.3, 1.3) # geometric factor
         b = G.cartRx3(XC0, XC1, H, XF0, XF1, R, dim=dim, rank=Cmpi.rank, size=Cmpi.size)
+
+        if isCheckMemory:
+            active_vars = None; del active_vars; active_vars = locals();
+            activeVarsLocal(active_vars, FunctionName='generate_list_offset_AfterCartX');
+            Cmpi.trace("generate_list_offset_AfterCartX", master=True, method=1)
+            Cmpi.trace("generate_list_offset_AfterCartX", master=True, method=0)
+            # here increase due to b - makes sense
 
         if tbv2 is not None: # get extended body next to sym plan (if any)
             tbLocal = Internal.getNodeFromNameAndType(tbv2, bname, 'CGNSBase_t')
@@ -400,12 +437,26 @@ def generateListOfOffsets__(tb, snears, offsetValues=[], dim=3, opt=False, nboxe
         C._initVars(tbLocal, 'cellN', 1.)
         C._initVars(b, 'cellN', 1.)
 
+        if isCheckMemory:
+            active_vars = None; del active_vars; active_vars = locals()
+            activeVarsLocal(active_vars, FunctionName='generate_list_offset_BeforeDTW')
+            Cmpi.trace("generate_list_offset_BeforeDTW", master=True, method=1)
+            Cmpi.trace("generate_list_offset_BeforeDTW", master=True, method=0)
+            # another increase due to adding more stuff to b - makes sense
+
         # distance to wall
         t0 = time.perf_counter()
         DTW._distance2Walls(b, tbLocal, type='ortho', loc='nodes', signed=0)
         tElapse = time.perf_counter()-t0
         tElapse = Cmpi.allreduce(tElapse, op=Cmpi.MAX)
         if Cmpi.master: print("Generate list of offsets: Base %s Num. %d:dist2wall: %.2fs"%(bname, nob, tElapse), flush=True)
+
+        if isCheckMemory:
+            active_vars = None; del active_vars; active_vars = locals()
+            activeVarsLocal(active_vars, FunctionName='generate_list_offset_AfterDTW')
+            Cmpi.trace("generate_list_offset_AfterDTW", master=True, method=1)
+            Cmpi.trace("generate_list_offset_AfterDTW", master=True, method=0)
+            # another increase due to dist2wall - adding distance variable. makes sense
 
         # blanking (xray or tri)
         BM = numpy.ones((1, 1), dtype=numpy.int32)
@@ -421,9 +472,17 @@ def generateListOfOffsets__(tb, snears, offsetValues=[], dim=3, opt=False, nboxe
         if nob >= nbases-nboxes: preffixLocal = 'Tbox_offsetBase'
         # all body offsets are prefaced by 'z_offsetBase' - only the zone name
         # all tbox offsets are prefaced by 'Tbox_offsetBase' - only the zone name
+
+        if isCheckMemory:
+            active_vars = None; del active_vars; active_vars = locals()
+            activeVarsLocal(active_vars, FunctionName='generate_list_offset_BeforeISO')
+            Cmpi.trace("generate_list_offset_BeforeISO", master=True, method=1)
+            Cmpi.trace("generate_list_offset_BeforeISO", master=True, method=0)
+            #no increase from previous check - makes sense - have t now that has same size as b
+
         for no_offset, offsetval in enumerate(offsetValues[nob]):
             if Cmpi.master: print("Offset %d - value: %g - snear: %g"%(no_offset, offsetval, snears[nob][0]*2**no_offset), flush=True)
-            iso = P.isoSurfMC(t, 'TurbulentDistance', offsetval)
+            iso = P.isoSurfMC(t, 'TurbulentDistance', offsetval) #here is the first unexplained increaes
             iso = Cmpi.allgatherZones(iso)
             iso = C.convertArray2Tetra(iso)
             iso = T.join(iso)
@@ -436,6 +495,26 @@ def generateListOfOffsets__(tb, snears, offsetValues=[], dim=3, opt=False, nboxe
             C._addBase2PyTree(toffset, 'OFFSETBase%d_%d'%(nob, no_offset))
             toffset[2][no_offsetGlobal+1][2] = [iso]
             no_offsetGlobal += 1
+
+    if isCheckMemory:
+        active_vars = None; del active_vars; active_vars = locals()
+        activeVarsLocal(active_vars, FunctionName='generate_list_offset_END')
+        # If reference count > 1 (excluding getrefcount's own reference), another variable points to this object
+        print("Reference count :: b:", sys.getrefcount(b) - 1)
+        print("Reference count :: t:", sys.getrefcount(t) - 1)
+
+    del iso
+    del b
+    del tbLocal
+    del t
+    del offsetValues
+    #If self-referencing dictionaries are created, Python's Garbage Collector can resolve the cycle once del is called:
+    gc.collect()
+
+    if isCheckMemory:
+        Cmpi.trace("generate_list_offset_END", master=True, method=1)
+        Cmpi.trace("generate_list_offset_END", master=True, method=0)
+        # Memory - biggest items b & t. but only have 1 refcount for each so all should be good when deleted.
 
     return toffset
 
@@ -807,6 +886,11 @@ def tagOutsideBody__(o, body, dim=3, h_target=-1., opt=False, noffsets=None, coa
     C._initVars(to, "{centers:indicatorTmp} = ({centers:cellN}>0)")
     C._rmVars(to, ["cellN","centers:cellN"])
     o = Internal.getZones(to)[0]
+    C._initVars(o, "{centers:indicator} = {centers:indicator} * {centers:indicatorTmp}")
+    C._rmVars(o, ["centers:indicatorTmp"])
+    del to
+    del bodies1
+    del body
     return o
 
 def tagInsideOffset__(o, offset1=None, offset2=None, dim=3, h_target=-1., opt=False, noffsets=None, coarseXray=False, blankCellsAlgo='xray'):
@@ -881,6 +965,13 @@ def tagInsideOffset__(o, offset1=None, offset2=None, dim=3, h_target=-1., opt=Fa
 
     C._rmVars(to, ["cellN", "cellNIn", "cellNOut", "centers:cellN", "centers:vol", "centers:h"])
     o = Internal.getZones(to)[0]
+    C._initVars(o, "{centers:indicator} = {centers:indicator} + {centers:indicatorTmp}")
+    C._rmVars(o, ["centers:indicatorTmp"])
+    del to
+    del offset1
+    del offset2
+    del bodies1
+    del bodies2
     return o
 
 def createQuadSurfaceFromNgonPointListBigFace__(a, cranges, indices_owners=[], dimPb=3):
@@ -1360,14 +1451,22 @@ def checkBodyIntersection__(tb):
         for j in range(0, i):
             zj = T.join(Internal.getZones(bases[j]))
             if G.bboxIntersection(zi, zj) > 0: return True
+            del zj
+        del zi
     return False
 
 def adaptMesh__(fileSkeleton, hmin, tb, toffset=None, dim=3, loadBalancing=False, opt=False, nboxes=0, blankCellsAlgo='xray', elementType='HEXA'):
     from mpi4py import MPI # for MPI_Init
     import Generator.Mpi as Gmpi
-
+    cart_hexa = None
     o, res = XC.loadAndSplitNGon(fileSkeleton)
     Cmpi.barrier()
+
+    if isCheckMemory:
+        active_vars = None; del active_vars; active_vars = locals()
+        activeVarsLocal(active_vars, FunctionName='adaptmesh_afterLoadandSplit')
+        Cmpi.trace("adaptmesh_afterLoadandSplit", master=True, method=1)
+        Cmpi.trace("adaptmesh_afterLoadandSplit", master=True, method=0)
 
     coarseXray = False
     lenMax = 0.0
@@ -1385,6 +1484,12 @@ def adaptMesh__(fileSkeleton, hmin, tb, toffset=None, dim=3, loadBalancing=False
     if dim == 3: normal2D = None
     else: normal2D = numpy.array([0.0, 0.0, 1.0])
     hookAM = XC.AdaptMesh_Init(o, normal2D, comm=comm, gcells=gcells, gfaces=gfaces)
+
+    if isCheckMemory:
+        active_vars = None; del active_vars; active_vars = locals()
+        activeVarsLocal(active_vars, FunctionName='adaptmesh_afterHook')
+        Cmpi.trace("adaptmesh_afterHook", master=True, method=1)
+        Cmpi.trace("adaptmesh_afterHook", master=True, method=0)
 
     # get new Offset lists for and tbox
     sortDictOffsetIBM = {}
@@ -1424,6 +1529,12 @@ def adaptMesh__(fileSkeleton, hmin, tb, toffset=None, dim=3, loadBalancing=False
     offset_inside = [Internal.getZones(tb)]
     if nboxes > 0: offset_inside.append(None)
 
+    if isCheckMemory:
+        active_vars = None; del active_vars; active_vars = locals()
+        activeVarsLocal(active_vars, FunctionName='adaptmesh_Dicts')
+        Cmpi.trace("adaptmesh_Dicts", master=True, method=1)
+        Cmpi.trace("adaptmesh_Dicts", master=True, method=0)
+
     noffsets = max(offset_nbases) # max offset for all the bases
 
     for level in range(noffsets-1, -1, -1):
@@ -1452,20 +1563,12 @@ def adaptMesh__(fileSkeleton, hmin, tb, toffset=None, dim=3, loadBalancing=False
                     # offset1: cgns base of tb or tbox (tag outside)
                     # offset2: offset (tag inside)
                     o = tagInsideOffset__(o, offset1=offset_inside[nob], offset2=offsetLocal, dim=dim, h_target=hminLocal, opt=opt, noffsets=level, coarseXray=coarseXray, blankCellsAlgo=blankCellsAlgo)
-                    C._initVars(o, "{centers:indicator} = {centers:indicator} + {centers:indicatorTmp}")
-                    C._rmVars(o, ["centers:indicatorTmp"])
-
                 if bodyIntersection:
                     if Cmpi.master: print('Warning: Bases in tb intersect - recursive tagOutsideBody to avoid refining the intersection of the bases...', flush=True)
                     for base in Internal.getBases(tb):
                         o = tagOutsideBody__(o, body=base, dim=dim, coarseXray=coarseXray, blankCellsAlgo=blankCellsAlgo)
-                        C._initVars(o, "{centers:indicator} = {centers:indicator} * {centers:indicatorTmp}")
-                        C._rmVars(o, ["centers:indicatorTmp"])
-
                 # tag cellN=0 the region enclosed inside the body - need to avoid adapting inside the body when the tbox cuts the body
                 o = tagOutsideBody__(o, body=offset_inside[0], dim=dim, h_target=hx, opt=opt, noffsets=level, coarseXray=coarseXray, blankCellsAlgo=blankCellsAlgo)
-                C._initVars(o, "{centers:indicator} = {centers:indicator} * {centers:indicatorTmp}")
-                C._rmVars(o, ["centers:indicatorTmp"])
 
                 # AdaptMesh -> 0: no refinement & >=1: refinement
                 # To avoid unexpected behaviors the indicator needs to be binary -> 0: no refinement & 1: refinement
@@ -1512,9 +1615,37 @@ def adaptMesh__(fileSkeleton, hmin, tb, toffset=None, dim=3, loadBalancing=False
         zone_nonconformal = T.join(zone_nonconformal_inter, zone_nonconformal_intra)
         _createBCNearMatch__(cart_hexa, zone_nonconformal)
     _createBCStandard__(cart_hexa, o)
-    del o
 
     Cmpi._setProc(cart_hexa, Cmpi.rank)
+
+    if isCheckMemory:
+        active_vars = None; del active_vars; active_vars = locals()
+        activeVarsLocal(active_vars, FunctionName='adaptMesh')
+
+    del f
+    del REF
+    del tmpOffset
+    del tt
+    del sortDictOffsetIBM
+    del sortDictOffsetTbox
+    del newOffsetsIBM
+    del newOffsetsTbox
+    del owners
+    del levels
+    del halo_levels
+    del neighbours
+    del cranges
+    del o
+    del res
+    del offset_zones
+    del z
+    del hookAM
+    del toffset
+    del gcells
+    del gfaces
+    del comm
+    del offsetLocal
+    gc.collect()
     return cart_hexa
 
 #==================================================================
@@ -1537,7 +1668,8 @@ def generateAMRMesh(tb, toffset=None, levelMax=0, vmins=11, snears=0.01, dfars=1
         raise ValueError('elementType only accepts values of HEXA or NGON.')
         Cmpi.abort(errorcode=1)
 
-    Cmpi.trace('AMR Mesh Generation...start', master=True)
+    Cmpi.trace('AMR Mesh Generation...start', master=True, method=1)
+    Cmpi.trace('AMR Mesh Generation...start', master=True, method=0)
     fileSkeleton = 'skeleton.cgns'
     pathSkeleton = os.path.join(localDir, fileSkeleton)
 
@@ -1568,6 +1700,10 @@ def generateAMRMesh(tb, toffset=None, levelMax=0, vmins=11, snears=0.01, dfars=1
         NumMinDxLarge = 1
     NumMinDxLarge += 1 # we add one as the check later on is on nodes & not cells.
 
+    if isCheckMemory2:
+        Cmpi.trace("End of...0", master=True, method=1)
+        Cmpi.trace("End of...0", master=True, method=0)
+
     #============================
     # STEP 1: Check baseSYM
     #============================
@@ -1590,6 +1726,10 @@ def generateAMRMesh(tb, toffset=None, levelMax=0, vmins=11, snears=0.01, dfars=1
 
         if check and Cmpi.master and tbv2: C.convertPyTree2File(tbv2, os.path.join(localDir, "tb_extension.cgns"))
 
+    if isCheckMemory2:
+        Cmpi.trace("End of...1", master=True, method=1)
+        Cmpi.trace("End of...1", master=True, method=0)
+
     #============================
     # STEP 2: Check snears/vmins
     #============================
@@ -1611,6 +1751,10 @@ def generateAMRMesh(tb, toffset=None, levelMax=0, vmins=11, snears=0.01, dfars=1
         print('WARNING:: Debug - after Step 2 check snears/vmins - vmins=', vmins, flush=True)
         print('WARNING:: Debug - after Step 2 check snears/vmins - nbases=', nbases, flush=True)
         print('===========================================================', flush=True)
+
+    if isCheckMemory2:
+        Cmpi.trace("End of...2", master=True, method=1)
+        Cmpi.trace("End of...2", master=True, method=0)
 
     #============================
     # STEP 3: Check tbox
@@ -1636,6 +1780,10 @@ def generateAMRMesh(tb, toffset=None, levelMax=0, vmins=11, snears=0.01, dfars=1
         print('WARNING:: Debug - after Step 3 check tbox - nbases=', nbases, flush=True)
         print('WARNING:: Debug - after Step 3 check tbox - nboxes=', nboxes, flush=True)
         print('===========================================================', flush=True)
+
+    if isCheckMemory2:
+        Cmpi.trace("End of...3", master=True, method=1)
+        Cmpi.trace("End of...3", master=True, method=0)
 
     #============================
     # STEP 4: Check multi. snears
@@ -1669,6 +1817,10 @@ def generateAMRMesh(tb, toffset=None, levelMax=0, vmins=11, snears=0.01, dfars=1
         print('WARNING:: Debug - after Step 4 check multi snears - nbases=', nbases, flush=True)
         print('WARNING:: Debug - after Step 4 check multi snears - nboxes=', nboxes, flush=True)
         print('===========================================================', flush=True)
+
+    if isCheckMemory2:
+        Cmpi.trace("End of...4", master=True, method=1)
+        Cmpi.trace("End of...4", master=True, method=0)
 
     #============================
     # STEP 5: Generate back. grid
@@ -1738,6 +1890,10 @@ def generateAMRMesh(tb, toffset=None, levelMax=0, vmins=11, snears=0.01, dfars=1
             raise ValueError('There are more MPI processes (Nmpi) [%d] than number of cells in the background skeleton/octree mesh (Ncells) [%d]. Note: Nmpi ≤ Ncells. Exiting...'%(Cmpi.size, Ncells))
             Cmpi.abort(errorcode=1)
 
+    if isCheckMemory2:
+        Cmpi.trace("End of...5", master=True, method=1)
+        Cmpi.trace("End of...5", master=True, method=0)
+
     #============================
     # STEP 6: Update snears
     #============================
@@ -1758,6 +1914,10 @@ def generateAMRMesh(tb, toffset=None, levelMax=0, vmins=11, snears=0.01, dfars=1
     if Cmpi.master and isDebuggingPrint:
         print('WARNING:: Debug - end of  Step 6 - snears=', snears, flush=True)
         print('===========================================================', flush=True)
+
+    if isCheckMemory2:
+        Cmpi.trace("End of...6", master=True, method=1)
+        Cmpi.trace("End of...6", master=True, method=0)
 
     #============================
     # STEP 7: Update dfars
@@ -1794,6 +1954,11 @@ def generateAMRMesh(tb, toffset=None, levelMax=0, vmins=11, snears=0.01, dfars=1
         dfarmax = min(bbo[3]-bbo[0], bbo[4]-bbo[1])
         if dim == 3: dfarmax = min(dfarmax, bbo[5]-bbo[2])
 
+    if isCheckMemory2:
+        Cmpi.trace("End of...7", master=True, method=1)
+        Cmpi.trace("End of...7", master=True, method=0)
+        #Memory - all good no significant increase
+
     #============================
     # STEP 8: Generate offsets
     #============================
@@ -1823,11 +1988,27 @@ def generateAMRMesh(tb, toffset=None, levelMax=0, vmins=11, snears=0.01, dfars=1
 
             offsetValues.append(offsetValuesBase)
 
+        if isCheckMemory:
+            active_vars = None; del active_vars; active_vars = locals()
+            activeVarsLocal(active_vars, FunctionName='begin_of_8')
+            Cmpi.trace("Begin of...8", master=True, method=1)
+            Cmpi.trace("Begin of...8", master=True, method=0)
+
         # generate list of offsets
         # tb & tbox
         if Cmpi.master: print("Generate list of offsets for rank ", Cmpi.rank, flush=True)
         toffset = generateListOfOffsets__(tb_tbox, snears, offsetValues=offsetValues, dim=dim, opt=opt, nboxes=nboxes, tbv2=tbv2, blankCellsAlgo=blankCellsAlgo)
         if check and Cmpi.master: C.convertPyTree2File(toffset, os.path.join(localDir, "offset.cgns"))
+
+    if isCheckMemory or isCheckMemory2:
+        if isCheckMemory:
+            active_vars = None; del active_vars; active_vars = locals()
+            activeVarsLocal(active_vars, FunctionName='end_of_8')
+        Cmpi.trace("End of...8", master=True, method=1)
+        Cmpi.trace("End of...8", master=True, method=0)
+        #Memory increased - not realated to toffset - larger than what toffset should be
+        # I really do not understand what happens to memory that stay put & is not free starting from generateListOfOffsets__
+        # I delete all local variables in that functions that be of significant memory but I still have something that is saved.
 
     #============================
     # STEP 9: Mesh adaptation
@@ -1837,8 +2018,15 @@ def generateAMRMesh(tb, toffset=None, levelMax=0, vmins=11, snears=0.01, dfars=1
     # only tb --> for blanking & tagging inside the geometry
     Cmpi.barrier()
     o = adaptMesh__(pathSkeleton, hmin, tb_noSym, toffset=toffset, dim=dim, loadBalancing=loadBalancing, opt=opt, nboxes=nboxes, blankCellsAlgo=blankCellsAlgo, elementType=elementType)
-    Cmpi.trace('AMR Mesh Generation...end', master=True)
+    Cmpi.trace('AMR Mesh Generation...end', master=True, method=1)
+    Cmpi.trace('AMR Mesh Generation...end', master=True, method=0)
 
+    if isCheckMemory:
+        active_vars = None; del active_vars; active_vars = locals()
+        activeVarsLocal(active_vars, FunctionName='generateAMRMesh')
+
+    del toffset
+    del tb_tbox
     return o # requirement for X_AMR (one zone per base, one base per proc)
 
 #==================================================================
