@@ -503,11 +503,7 @@ def generateListOfOffsets__(tb, snears, offsetValues=[], dim=3, opt=False, nboxe
         print("Reference count :: b:", sys.getrefcount(b) - 1)
         print("Reference count :: t:", sys.getrefcount(t) - 1)
 
-    del iso
-    del b
-    del tbLocal
-    del t
-    del offsetValues
+    del iso, b, tbLocal, t, offsetValues
     #If self-referencing dictionaries are created, Python's Garbage Collector can resolve the cycle once del is called:
     gc.collect()
 
@@ -888,9 +884,7 @@ def tagOutsideBody__(o, body, dim=3, h_target=-1., opt=False, noffsets=None, coa
     o = Internal.getZones(to)[0]
     C._initVars(o, "{centers:indicator} = {centers:indicator} * {centers:indicatorTmp}")
     C._rmVars(o, ["centers:indicatorTmp"])
-    del to
-    del bodies1
-    del body
+    del to, bodies1, body
     return o
 
 def tagInsideOffset__(o, offset1=None, offset2=None, dim=3, h_target=-1., opt=False, noffsets=None, coarseXray=False, blankCellsAlgo='xray'):
@@ -967,11 +961,7 @@ def tagInsideOffset__(o, offset1=None, offset2=None, dim=3, h_target=-1., opt=Fa
     o = Internal.getZones(to)[0]
     C._initVars(o, "{centers:indicator} = {centers:indicator} + {centers:indicatorTmp}")
     C._rmVars(o, ["centers:indicatorTmp"])
-    del to
-    del offset1
-    del offset2
-    del bodies1
-    del bodies2
+    del to, offset1, offset2, bodies1, bodies2
     return o
 
 def createQuadSurfaceFromNgonPointListBigFace__(a, cranges, indices_owners=[], dimPb=3):
@@ -1622,29 +1612,8 @@ def adaptMesh__(fileSkeleton, hmin, tb, toffset=None, dim=3, loadBalancing=False
         active_vars = None; del active_vars; active_vars = locals()
         activeVarsLocal(active_vars, FunctionName='adaptMesh')
 
-    del f
-    del REF
-    del tmpOffset
-    del tt
-    del sortDictOffsetIBM
-    del sortDictOffsetTbox
-    del newOffsetsIBM
-    del newOffsetsTbox
-    del owners
-    del levels
-    del halo_levels
-    del neighbours
-    del cranges
-    del o
-    del res
-    del offset_zones
-    del z
-    del hookAM
-    del toffset
-    del gcells
-    del gfaces
-    del comm
-    del offsetLocal
+    del f, REF, tmpOffset, tt, sortDictOffsetIBM, sortDictOffsetTbox, newOffsetsIBM, newOffsetsTbox, owners, levels, halo_levels
+    del neighbours, cranges, o, res, offset_zones, z, hookAM, toffset, gcells, gfaces, comm, offsetLocal
     gc.collect()
     return cart_hexa
 
@@ -2025,8 +1994,7 @@ def generateAMRMesh(tb, toffset=None, levelMax=0, vmins=11, snears=0.01, dfars=1
         active_vars = None; del active_vars; active_vars = locals()
         activeVarsLocal(active_vars, FunctionName='generateAMRMesh')
 
-    del toffset
-    del tb_tbox
+    del toffset, tb_tbox
     return o # requirement for X_AMR (one zone per base, one base per proc)
 
 #==================================================================
