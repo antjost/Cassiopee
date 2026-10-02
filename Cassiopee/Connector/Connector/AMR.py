@@ -34,16 +34,27 @@ def outputTime(startTime,functionName='FunctionName'):
     return None
 
 # ===============================================================================================================================
-def prepareAMRData(t_case, t, IBM_parameters=None, check=False, dim=3, localDir='./', forceAlignment=False, isFastApproach=True):
+def prepareAMRData(t_case, t, IBM_parameters=None, check=False, dim=3, localDir='./', forceAlignment=False, isFastApproach=True, **kwargs):
+    # non-regression parameters
+    isNonRegression = kwargs.get('isNonRegression', False)
+
     Cmpi.trace('AMR prepare IBM...start', master=True)
     if "method" in IBM_parameters["IBM type"].keys() or IBM_parameters["spatial discretization"]["type"] in ["DG", "DGSEM"]:
         t = prepareAMRDataDG__(t_case, t, IBM_parameters=IBM_parameters, check=check, dim=dim, localDir=localDir, forceAlignment=forceAlignment, isFastApproach=isFastApproach)
     else:
-        t = prepareAMRDataFV__(t_case, t, IBM_parameters=IBM_parameters, check=check, dim=dim, localDir=localDir, forceAlignment=forceAlignment, isFastApproach=isFastApproach)
+        t = prepareAMRDataFV__(t_case, t, IBM_parameters=IBM_parameters, check=check, dim=dim, localDir=localDir, forceAlignment=forceAlignment, isFastApproach=isFastApproach, isNonRegression=isNonRegression)
     Cmpi.trace('AMR prepare IBM...end', master=True, cpu=True)
     return t
 
-def prepareAMRDataFV__(t_case, t, IBM_parameters=None, check=False, dim=3, localDir='./', forceAlignment=False, isFastApproach=True):
+def prepareAMRDataFV__(t_case, t, IBM_parameters=None, check=False, dim=3, localDir='./', forceAlignment=False, isFastApproach=True, **kwargs):
+    # non-regression parameters
+    isNonRegression = kwargs.get('isNonRegression', False)
+
+    if Cmpi.master and isNonRegression:
+        print("=====================================", flush=True)
+        print("========= Non-regression Test =======", flush=True)
+        print("=====================================", flush=True)
+
     VPM = False
 
     (IBM_parameters, frontTypeIP, frontTypeDP, dir_sym, different_front_flag) = checkInputsIbmParam__(IBM_parameters)
@@ -87,10 +98,13 @@ def prepareAMRDataFV__(t_case, t, IBM_parameters=None, check=False, dim=3, local
         print('Final number of cells=%5.4f millions.'%(NCells*1e-6), flush=True)
 
     #=======================================================================
-    # STEP 2: Save BC Names & Types - check if QuadNQuad is fully inside IBM
+    # STEP 2: Save BC Names & Types - check if QuadNQuad is fully inside IBM [non-regression -> OK]
     #=======================================================================
     (zbcs, bctypes, bcnames) = boundaryConditionPrep__(t, tb2, dim)
-
+    if Cmpi.master and isNonRegression:
+        test.testT(zbcs,20)
+        test.testO(bctypes, 21)
+        test.testO(bcnames, 22)
     #===============================================================================================================================
     # STEP 3: Get Integration Point Front (Recall: IP = integration point (NOT image point) - Target cells in Mittal et al. approach)
     #===============================================================================================================================
@@ -98,6 +112,8 @@ def prepareAMRDataFV__(t_case, t, IBM_parameters=None, check=False, dim=3, local
     Cmpi.trace("Extract front faces of IBM integration points [start] ", master=True, cpu=False)
     frontIP = extractFrontIP(t, dim, IBM_parameters, VPM=VPM)
     Cmpi.trace("Extract front faces of IBM integration points [end]   ", master=True, cpu=False)
+    if Cmpi.master and isNonRegression:
+        test.testT(frontIP, 30)
 
     maxDistanceFrontIP = 0.0
     turbDistanceTmp = Internal.getNodeFromName(frontIP, 'TurbulentDistance')[1]
@@ -105,7 +121,10 @@ def prepareAMRDataFV__(t_case, t, IBM_parameters=None, check=False, dim=3, local
     maxDistanceFrontIP = Cmpi.allreduce(maxDistanceFrontIP, op=Cmpi.MAX)
     if Cmpi.master: print('extractFrontDP Info: maxDistanceFrontIP=%g'%maxDistanceFrontIP, flush=True)
 
-    (frontIP_gath, dimfrontIP)= gatherIPFront__(frontIP, localDir, check)
+    (frontIP_gath, dimfrontIP) = gatherIPFront__(frontIP, localDir, check)
+    if Cmpi.master and isNonRegression:
+        test.testT(frontIP, 31)
+
     ### for debugging - keep here for now
     #frontDP_gath = extractFrontDP(t, tb2, frontIP_gath, dim, dir_sym, check, distIP=maxDistanceFrontIP, localDir=localDir, isFastApproach=True)
     #frontDP_gath = extractFrontDP(t, tb2, frontIP_gath, dim, dir_sym, check, distIP=maxDistanceFrontIP, localDir=localDir, isFastApproach=False)
@@ -125,6 +144,7 @@ def prepareAMRDataFV__(t_case, t, IBM_parameters=None, check=False, dim=3, local
     Internal._rmNodesFromName(t,"FlowSolution")
     Internal._rmNodesFromType(t, "Family_t")
     Cmpi.trace(" Removing blanked cells [end]  ", master=True, cpu=False)
+    if Cmpi.master and isNonRegression: test.testT(t, 40)
 
     #===============================
     # STEP 5: Recover BCs - Add IBCs
@@ -136,9 +156,16 @@ def prepareAMRDataFV__(t_case, t, IBM_parameters=None, check=False, dim=3, local
             Internal._rmNode(t_exteriorFaces, elt_t)
     _recoverBoundaryConditions__(t, t_exteriorFaces, zbcs, bctypes, bcnames)
     Cmpi.trace(" Recovering Boundary Conditions [end]  ", master=True, cpu=False)
+    if Cmpi.master and isNonRegression:
+        test.testT(t, 50)
+        test.testT(t_exteriorFaces, 51)
     #Cmpi.convertPyTree2File(t,'check_t_afterBC.cgns')
 
     (frontIP, facesExt, dimfrontIP) = getFrontIBCs__(t_exteriorFaces, frontIP_gath)
+    if Cmpi.master and isNonRegression:
+        test.testT(frontIP, 52)
+        test.testT(facesExt, 53)
+        test.testO(dimfrontIP, 54)
 
     #===================================================================================
     # STEP 6: Get Donor Point Front (Recall: DP = image point in Mittal et. al approach)
@@ -151,6 +178,8 @@ def prepareAMRDataFV__(t_case, t, IBM_parameters=None, check=False, dim=3, local
         frontDP_gath = extractFrontDP(t, tb2, frontIP_gath, dim, dir_sym, check, distIP=maxDistanceFrontIP, localDir=localDir, isFastApproach=isFastApproach)
     del frontIP_gath
     Cmpi.trace(" Extracting front of the donor points [end]  ", master=True, cpu=False)
+    if Cmpi.master and isNonRegression:
+        test.testT(frontDP_gath, 60)
 
     # Determine location of DP points on DP Front
     # 1. calculate normals from tb2 to frontIP
@@ -158,11 +187,14 @@ def prepareAMRDataFV__(t_case, t, IBM_parameters=None, check=False, dim=3, local
         Cmpi.trace(" Computing normals via project ortho [start]", master=False, cpu=False)
         _computeIBCNormals__(frontIP, tb2)
         Cmpi.trace(" Computing normals via project ortho [end]  ", master=False, cpu=False)
+        if Cmpi.master and isNonRegression:
+            test.testT(frontIP, 61)
         frontIP_C = C.node2Center(frontIP)
         Internal._rmNodesByType(frontIP_C, "Elements_t")
         
-        _getIBMData__(t, facesExt, tb2, frontIP, frontIP_C, frontDP_gath, bbo, IBM_parameters, check, dim, forceAlignment, localDir)
-
+        _getIBMData__(t, facesExt, tb2, frontIP, frontIP_C, frontDP_gath, bbo, IBM_parameters, check, dim, forceAlignment, localDir, isNonRegression=isNonRegression)
+        if Cmpi.master and isNonRegression:
+            test.testT(frontIP, 65)
     C._rmVars(t,['cellNFront'])
 
     for z in Internal.getZones(t): Cmpi._setProc(z, Cmpi.rank)
@@ -919,11 +951,18 @@ def _computeIBCNormals__(front, tb2):
     Internal.newDataArray(varsn[2], value=dirz0, parent=FS)
     return None
 
-def _getIBMData__(t, facesExt, tb2, frontIP, frontIP_C, frontDP_gath, bbo, IBM_parameters, check, dim, forceAlignment, localDir):
+def _getIBMData__(t, facesExt, tb2, frontIP, frontIP_C, frontDP_gath, bbo, IBM_parameters, check, dim, forceAlignment, localDir, **kwargs):
+    # non-regression parameters
+    isNonRegression = kwargs.get('isNonRegression', False)
+
     Cmpi.trace(" Extracting IBM Points [start]", master=False, cpu=False)
     integrationPts, donorPts, wallPts = getAllIBMPoints(tb2, frontIP, frontIP_C, frontDP_gath, bbo, IBM_parameters, check, dim,
                                                   forceAlignment, localDir=localDir)
     Cmpi.trace(" Extracting IBM Points [end]"  , master=False, cpu=False)
+    if Cmpi.master and isNonRegression:
+        test.testO(integrationPts, 62)
+        test.testO(donorPts, 63)
+        test.testO(wallPts, 64)
 
     Cmpi.trace(" Adding IBCDatasets [start]", master=False, cpu=False)
     _addIBCData__(t, facesExt, donorPts, wallPts, integrationPts, IBM_parameters)
