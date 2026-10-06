@@ -191,7 +191,7 @@ def prepareAMRDataDG__(t_case, t, IBM_parameters=None, check=False, dim=3, local
     #===============================================================================================================================
     # only done for frontTypeIP=2 - if frontTypeIP=1 it is F1 so blankByIBCBodies is sufficient for the cellN value
     Cmpi.trace("Extract front faces of IBM integration points [start] ", master=True, cpu=False)
-    frontIP, maxDistIP = getFrontIP(t, IBM_parameters, localDir, check=check, VPM=VPM)
+    frontIP, maxDistIP = getFrontIP(t, IBM_parameters, localDir, False, VPM=VPM)
     Cmpi.trace("Extract front faces of IBM integration points [end]   ", master=True, cpu=False)
 
     #====================================================
@@ -205,7 +205,7 @@ def prepareAMRDataDG__(t_case, t, IBM_parameters=None, check=False, dim=3, local
     # STEP 5: Recover BCs - Add IBCs
     #===============================
     Cmpi.trace(" Recovering Boundary Conditions [start]", master=True, cpu=False)
-    t, zibc = recoverBCs(t, frontIP, BCInfo)
+    t, t_exteriorFaces, zibc = recoverBCs(t, frontIP, BCInfo)
     Cmpi.trace(" Recovering Boundary Conditions [end]  ", master=True, cpu=False)
 
     #===================================================================================
@@ -224,14 +224,14 @@ def prepareAMRDataDG__(t_case, t, IBM_parameters=None, check=False, dim=3, local
         # STEP 7: Determine DP points on DPfront & Add IBC Dataset to the PyTree
         #===================================================================================
         Cmpi.trace(" Getting DP IBM points and adding IBC Dataset [start]", master=True, cpu=False)
-        _setIBCDataDG(t, frontIP, tb2, zibc, frontDP, bbo, IBM_parameters, check, forceAlignment, localDir, different_front_flag)
+        _setIBCDataDG(t, t_exteriorFaces, tb2, zibc, frontDP, bbo, IBM_parameters, check, forceAlignment, localDir, different_front_flag)
         Cmpi.trace(" Getting DP IBM points and adding IBC Dataset [end]  ", master=True, cpu=False)
     else:
         #===================================================================================
         # STEP 7: Determine DP points on DPfront & Add IBC Dataset to the PyTree
         #===================================================================================
         ncellsIP = C.getNCells(zibc)
-        if ncellsIP>0: _addIBC2Zone__(t, frontIP, zibc)
+        if ncellsIP>0: _addIBC2Zone__(t, t_exteriorFaces, zibc)
 
 
     return t
@@ -842,7 +842,7 @@ def _setIBCData(t, frontIP, tb, zibc, frontDP, bbo, IBM_parameters, check, force
 
     return None
 
-def _setIBCDataDG(t, frontIP, tb, zibc, frontDP, bbo, IBM_parameters, check, forceAlignment, localDir, different_front_flag):
+def _setIBCDataDG(t, t_exteriorFaces, tb, zibc, frontDP, bbo, IBM_parameters, check, forceAlignment, localDir, different_front_flag):
     ncellsIP = C.getNCells(zibc)
 
     if ncellsIP > 0:
@@ -862,7 +862,7 @@ def _setIBCDataDG(t, frontIP, tb, zibc, frontDP, bbo, IBM_parameters, check, for
         Cmpi.trace(" Extracting IBM Points [end]"  , master=False, cpu=False)
 
         Cmpi.trace(" Adding IBCDatasets [start]", master=False, cpu=False)
-        _addIBCData__(t, frontIP, donorPts, wallPts, integrationPts, IBM_parameters)
+        _addIBCData__(t, t_exteriorFaces, donorPts, wallPts, integrationPts, IBM_parameters)
         Cmpi.trace(" Adding IBCDatasets [end]  ", master=False, cpu=False)
 
     C._rmVars(t, ['cellNFront'])
