@@ -96,7 +96,8 @@ def prepareAMRDataFV__(t_case, t, IBM_parameters=None, check=False, dim=3, local
     if Cmpi.master:
         print('Total number of zones=%d.'%Nzones, flush=True)
         print('Final number of cells=%5.4f millions.'%(NCells*1e-6), flush=True)
-
+    if Cmpi.master and isNonRegression:
+        test.testT(t,10)
     #=======================================================================
     # STEP 2: Save BC Names & Types - check if QuadNQuad is fully inside IBM [non-regression -> OK]
     #=======================================================================
@@ -112,8 +113,6 @@ def prepareAMRDataFV__(t_case, t, IBM_parameters=None, check=False, dim=3, local
     Cmpi.trace("Extract front faces of IBM integration points [start] ", master=True, cpu=False)
     frontIP = extractFrontIP(t, dim, IBM_parameters, VPM=VPM)
     Cmpi.trace("Extract front faces of IBM integration points [end]   ", master=True, cpu=False)
-    if Cmpi.master and isNonRegression:
-        test.testT(frontIP, 30)
 
     maxDistanceFrontIP = 0.0
     turbDistanceTmp = Internal.getNodeFromName(frontIP, 'TurbulentDistance')[1]
@@ -123,7 +122,7 @@ def prepareAMRDataFV__(t_case, t, IBM_parameters=None, check=False, dim=3, local
 
     (frontIP_gath, dimfrontIP) = gatherIPFront__(frontIP, localDir, check)
     if Cmpi.master and isNonRegression:
-        test.testT(frontIP, 31)
+        test.testT(frontIP_gath, 30)
 
     ### for debugging - keep here for now
     #frontDP_gath = extractFrontDP(t, tb2, frontIP_gath, dim, dir_sym, check, distIP=maxDistanceFrontIP, localDir=localDir, isFastApproach=True)
@@ -156,16 +155,13 @@ def prepareAMRDataFV__(t_case, t, IBM_parameters=None, check=False, dim=3, local
             Internal._rmNode(t_exteriorFaces, elt_t)
     _recoverBoundaryConditions__(t, t_exteriorFaces, zbcs, bctypes, bcnames)
     Cmpi.trace(" Recovering Boundary Conditions [end]  ", master=True, cpu=False)
-    if Cmpi.master and isNonRegression:
-        test.testT(t, 50)
-        test.testT(t_exteriorFaces, 51)
     #Cmpi.convertPyTree2File(t,'check_t_afterBC.cgns')
 
     (frontIP, facesExt, dimfrontIP) = getFrontIBCs__(t_exteriorFaces, frontIP_gath)
     if Cmpi.master and isNonRegression:
+        test.testT(t, 50)
+        test.testT(facesExt, 51)
         test.testT(frontIP, 52)
-        test.testT(facesExt, 53)
-        test.testO(dimfrontIP, 54)
 
     #===================================================================================
     # STEP 6: Get Donor Point Front (Recall: DP = image point in Mittal et. al approach)
@@ -194,7 +190,7 @@ def prepareAMRDataFV__(t_case, t, IBM_parameters=None, check=False, dim=3, local
         
         _getIBMData__(t, facesExt, tb2, frontIP, frontIP_C, frontDP_gath, bbo, IBM_parameters, check, dim, forceAlignment, localDir, isNonRegression=isNonRegression)
         if Cmpi.master and isNonRegression:
-            test.testT(frontIP, 65)
+            test.testT(t, 65)
     C._rmVars(t,['cellNFront'])
 
     for z in Internal.getZones(t): Cmpi._setProc(z, Cmpi.rank)
@@ -1050,10 +1046,10 @@ def getAllIBMPoints(tb, frontIP, frontIP_C, frontDP, bbo, IBM_parameters, check,
                 if type_4 > 0: X_IBM._prepOutputProject__(outputProjection4, 4, arrayLocal, allCorrectedPts[noz][1], allWallPts[noz][1], allInterpPts[noz][1])
 
             if outputProjection3[0] and check:
-                tLocal3  = X_IBM._writeOutputProject__(outputProjection3, tLocal3)
+                tLocal3  = X_IBM._writeOutputProject__(outputProjection3, tLocal3, nameZone)
                 isWrite3 = 1
             if outputProjection4[0] and check:
-                tLocal4  = X_IBM._writeOutputProject__(outputProjection4, tLocal4)
+                tLocal4  = X_IBM._writeOutputProject__(outputProjection4, tLocal4, nameZone)
                 isWrite4 = 1
 
             if check:
