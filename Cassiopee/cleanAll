@@ -43,6 +43,7 @@ do
       if [ -z "$ELSAPROD" ]; then
           rm -rf build
       else
+	  echo "deleting: $mod ... build: $ELSAPROD"
           rm -rf "build/$ELSAPROD"
           if [ "$REMOVE_DIST" -eq 1 ]; then
               shopt -s nocaseglob
