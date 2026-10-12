@@ -19,6 +19,7 @@ from Converter.Internal import E_NpyInt as E_NpyInt
 from .QuadratureDG import *
 
 __TOL__ = 1e-9
+
 def outputTime(startTime,functionName='FunctionName'):
     endTime     = time.perf_counter()
     elapsedTime = endTime-startTime
@@ -343,8 +344,25 @@ def removeBlankedCells(t):
 
 # ===============================================================================================================================
 def getBCs(t, tb2, dim):
-    (zbcs, bcnames, bctypes) = C.getBCs(t)
-    for zbc in zbcs: Internal._rmNodesByType(zbc, "FlowSolution_t")
+    if not isCasFunction:
+        # Identity the BCTypes & BCNames in t
+        zbcs=[]; bctypes=[]; bcnames=[]
+        for bc in Internal.getNodesFromType(t, 'BC_t'):
+            bctype = Internal.getValue(bc)
+            bcname = Internal.getName(bc)
+            if bctype not in bctypes:
+                bctypes.append(bctype)
+                bcnames.append(bcname)
+
+        # Save the boundary conditions for later use
+        for bctype in bctypes:
+            zbc = C.extractBCOfType(t, bctype)
+            Internal._rmNodesByType(zbc, "FlowSolution_t")
+            zbc = T.join(zbc)
+            zbcs.append(zbc)
+    else:
+        (zbcs, bcnames, bctypes) = C.getBCs(t)
+        for zbc in zbcs: Internal._rmNodesByType(zbc, "FlowSolution_t")
 
     # Blanking to check if the QuadNQuad BC is inside the geometry
     # Needed to avoid wrong BCs
@@ -379,6 +397,7 @@ def getBCs(t, tb2, dim):
 
 # ===============================================================================================================================
 def recoverBCs(t, frontIP, BCInfo):
+
     bcNamesDomain = ['BCSymmetryPlane', 'BCFarfield']
     tp = Internal.copyRef(t)
     t_exteriorFaces = P.exteriorFaces(tp)
