@@ -10,6 +10,7 @@ do
       if [ "$ELSAPROD" = "" ]; then
           rm -fr build
       else
+	  echo "deleting: $mod ... build: $ELSAPROD"
           rm -fr build/$ELSAPROD
       fi
       rm -fr .sconsign.dblite
