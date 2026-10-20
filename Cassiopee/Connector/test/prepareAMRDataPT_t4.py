@@ -21,7 +21,7 @@ def prepareAMRDataFV__(t_case, t, IBM_parameters=None, check=False, dim=3, local
 
     if isinstance(t_case, str): tb = C.convertFile2PyTree(t_case)
     else: tb = t_case
-    
+
     ## Note: tb2 is the correct geometry for 3D calcs.
     ##       2D: tb2 = tb with addkplane
     ##       3D: tb2 = tb
@@ -76,7 +76,7 @@ def prepareAMRDataFV__(t_case, t, IBM_parameters=None, check=False, dim=3, local
     t = X_AMR.removeBlankedCells(t)
     Cmpi.trace(" Removing blanked cells [end]  ", master=True, cpu=False)
     if Cmpi.master: test.testT(t, 40)
-    
+
     #===============================
     # STEP 5: Recover BCs - Add IBCs
     #===============================
@@ -124,7 +124,7 @@ dir_sym    = 2
 
 ##IBM
 frontType    = 2
-Reynolds     = 11.72e6 
+Reynolds     = 11.72e6
 yplus_target = 100
 Lref         = 0.801672959
 Aref         = 2.319399855
