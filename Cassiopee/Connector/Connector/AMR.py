@@ -19,6 +19,15 @@ from Converter.Internal import E_NpyInt as E_NpyInt
 from .QuadratureDG import *
 
 __TOL__ = 1e-9
+def checkElementType(t):
+    elementType = 'HEXA'
+    for z in Internal.getZones(t):
+        dimZone = Internal.getZoneDim(z)
+        if dimZone[3] == 'NGON':
+            elementType = 'NGON'
+            break
+    return elementType
+
 def outputTime(startTime,functionName='FunctionName'):
     endTime     = time.perf_counter()
     elapsedTime = endTime-startTime
@@ -49,6 +58,8 @@ def prepareAMRData(t_case, t, IBM_parameters=None, check=False, dim=3, localDir=
 
 def prepareAMRDataFV__(t_case, t, IBM_parameters=None, check=False, dim=3, localDir='./', forceAlignment=False, isFastApproach=True):
     VPM = False
+
+    elementType = checkElementType(t)
 
     (IBM_parameters, frontTypeIP, frontTypeDP, dir_sym, different_front_flag) = checkInputsIbmParam__(IBM_parameters)
 
@@ -97,21 +108,23 @@ def prepareAMRDataFV__(t_case, t, IBM_parameters=None, check=False, dim=3, local
     Cmpi.trace("Extract front faces of IBM integration points [start] ", master=True, cpu=False)
     frontIP, maxDistIP = getFrontIP(t, IBM_parameters, localDir, check=check, VPM=VPM)
     Cmpi.trace("Extract front faces of IBM integration points [end]   ", master=True, cpu=False)
-
+    
     #====================================================
     # STEP 4: Select Cells - only fluid cells from now on
     #====================================================
     Cmpi.trace(" Removing blanked cells [start]", master=True, cpu=False)
     t = removeBlankedCells(t)
     Cmpi.trace(" Removing blanked cells [end]  ", master=True, cpu=False)
-
+    
     #===============================
     # STEP 5: Recover BCs - Add IBCs
     #===============================
     Cmpi.trace(" Recovering Boundary Conditions [start]", master=True, cpu=False)
     t, zibc = recoverBCs(t, frontIP, BCInfo)
     Cmpi.trace(" Recovering Boundary Conditions [end]  ", master=True, cpu=False)
-
+    C.convertPyTree2File(t, 'check_t.cgns')
+    C.convertPyTree2File(frontDP, 'check_frontDP.cgns')
+    exit()
     #===================================================================================
     # STEP 6: Get Donor Point Front (Recall: DP = image point in Mittal et. al approach)
     #         Determine DP points on DPfront
@@ -129,7 +142,7 @@ def prepareAMRDataFV__(t_case, t, IBM_parameters=None, check=False, dim=3, local
     Cmpi.trace(" Getting DP IBM points and adding IBC Dataset [start]", master=True, cpu=False)
     _setIBCData(t, frontIP, tb2, zibc, frontDP, bbo, IBM_parameters, check, forceAlignment, localDir, different_front_flag)
     Cmpi.trace(" Getting DP IBM points and adding IBC Dataset [end]  ", master=True, cpu=False)
-
+    
     return t
 
 def prepareAMRDataDG__(t_case, t, IBM_parameters=None, check=False, dim=3, localDir='./', forceAlignment=False, isFastApproach=True):
@@ -327,11 +340,14 @@ def checkInputsIbmParam__(IBM_parametersIn):
 
 # ===============================================================================================================================
 def removeBlankedCells(t):
+    t = G.close(t, 1e-12, True, False, False, False, False, False)  # rmDuplicatedPts (PR #791 re-applied here)
     t = P.selectCells(t, '{cellN}==1.', strict=1)
-    # Make sure that the only node of type Elements_t is 'GridElements'
-    for node in Internal.getNodesFromType(t, 'Elements_t'):
-        if node[0] != 'GridElements':
-            Internal._rmNode(t, node)
+    elementType = checkElementType(t)
+    if elementType == "HEXA":
+        # Make sure that the only node of type Elements_t is 'GridElements'
+        for node in Internal.getNodesFromType(t, 'Elements_t'):
+            if node[0] != 'GridElements':
+                Internal._rmNode(t, node)
 
     Internal._rmNodesFromName(t, Internal.__FlowSolutionNodes__)
     Internal._rmNodesFromType(t, 'Family_t')
@@ -383,9 +399,11 @@ def recoverBCs(t, frontIP, BCInfo):
     t_exteriorFaces = P.exteriorFaces(tp)
 
     zbcs, bctypes, bcnames = BCInfo
-    for elt_t in Internal.getNodesFromType(t_exteriorFaces, "Elements_t"):
-        if not elt_t[0].startswith("GridElements"):
-            Internal._rmNode(t_exteriorFaces, elt_t)
+    elementType = checkElementType(t)
+    if elementType == "HEXA":
+        for elt_t in Internal.getNodesFromType(t_exteriorFaces, "Elements_t"):
+            if not elt_t[0].startswith("GridElements"):
+                Internal._rmNode(t_exteriorFaces, elt_t)
 
     C._recoverBCs(tp, (zbcs, bcnames, bctypes))
 
@@ -569,7 +587,14 @@ def extractFrontIP__(t, IBM_parameters, VPM=False):
         C._initVars(t, 'distance_IP', 2*snear)
         C._initVars(t, '{cellN}=1-({TurbulentDistance}<-{distance_IP})')
 
-    frontIP = P.frontFaces(t, 'cellN')
+    # Temporary until frontFaces supports NGONS:
+    elementType = checkElementType(t)
+    if elementType == "NGON":
+        tTmpBreak = T.breakElements(t)
+        frontIP = P.frontFaces(tTmpBreak, 'cellN')
+        del tTmpBreak
+    else:
+        frontIP = P.frontFaces(t, 'cellN')
     return frontIP
 
 def gatherFrontIP__(frontIP, localDir, check):
@@ -631,7 +656,15 @@ def extractFrontDP__(t, tb, frontIP_gath, dim, dir_sym, distIP, isFastApproach=T
         C._initVars(t, 'cellNFront', 1.)
         X_IBM._blankByIBCBodies(t, frontIP_gath, 'nodes', 3, cellNName="cellNFront")
         del frontIP_gath
-        frontDP = P.frontFaces(t, 'cellNFront')
+
+        elementType = checkElementType(t)
+        if elementType == "NGON":
+            tTmpBreak = T.breakElements(t)
+            frontDP = P.frontFaces(tTmpBreak, 'cellNFront')
+            del tTmpBreak
+        else:
+            frontDP = P.frontFaces(t, 'cellNFront')
+
         del t
         outputTime(startTimeExtract,functionName='extractFrontDP__ - Fast Approach')
     else:
@@ -821,16 +854,18 @@ def _setIBCData(t, frontIP, tb, zibc, frontDP, bbo, IBM_parameters, check, force
         Cmpi.trace(" Computing normals via project ortho [end]  ", master=False, cpu=False)
 
         zcibc = C.node2Center(zibc)
-        Internal._rmNodesByType(zcibc, "Elements_t")
+        elementType = checkElementType(t)
+        if elementType == "HEXA": Internal._rmNodesByType(zcibc, "Elements_t")
 
         Cmpi.trace(" Extracting IBM Points [start]", master=False, cpu=False)
-        integrationPts, donorPts, wallPts = getAllIBMPoints__(tb, zcibc, frontDP, bbo, IBM_parameters, check, forceAlignment, localDir)
+        integrationPts, donorPts, wallPts = getAllIBMPoints__(tb, zcibc, frontDP, bbo, IBM_parameters, check, forceAlignment, localDir, elementType)
         Cmpi.trace(" Extracting IBM Points [end]"  , master=False, cpu=False)
 
         Cmpi.trace(" Adding IBCDatasets [start]", master=False, cpu=False)
         _addIBCData__(t, frontIP, donorPts, wallPts, integrationPts, IBM_parameters)
         Cmpi.trace(" Adding IBCDatasets [end]  ", master=False, cpu=False)
-
+        C.convertPyTree2File(t, 'check_t_%s.cgns'%elementType)
+        exit()
     C._rmVars(t, ['cellNFront'])
 
     if different_front_flag == False: #True is default
@@ -903,7 +938,7 @@ def _computeIBCNormals__(front, tb):
     Internal.newDataArray(varsn[2], value=dirz0, parent=FS)
     return None
 
-def getAllIBMPoints__(tb, zcibc, frontDP, bbo, IBM_parameters, check, forceAlignment=False, localDir='./'):
+def getAllIBMPoints__(tb, zcibc, frontDP, bbo, IBM_parameters, check, forceAlignment=False, localDir='./', elementType='HEXA'):
     projAlgo = 0
 
     frontTypeDP = IBM_parameters["donor points"]["front type"]
@@ -1032,9 +1067,9 @@ def getAllIBMPoints__(tb, zcibc, frontDP, bbo, IBM_parameters, check, forceAlign
 
     if check:
         print("Rank: %d :: Writing IBM tecplot files..."%Cmpi.rank, flush=True)
-        Converter.convertArrays2File(integrationPts  , localDir+"integrationPts_proc%s.plt" %Cmpi.rank)
-        Converter.convertArrays2File(wallPts , localDir+"wallPts_proc%s.plt" %Cmpi.rank)
-        Converter.convertArrays2File(donorPts, localDir+"donorPts_proc%s.plt" %Cmpi.rank)
+        Converter.convertArrays2File(integrationPts  , localDir+"integrationPts_%s_proc%s.plt" %(elementType, Cmpi.rank))
+        Converter.convertArrays2File(wallPts , localDir+"wallPts_%s_proc%s.plt" %(elementType, Cmpi.rank))
+        Converter.convertArrays2File(donorPts, localDir+"donorPts_%s_proc%s.plt" %(elementType, Cmpi.rank))
 
     dictOfDonorPtsByIBCName={}
     dictOfIntegrationPtsByIBCName={}
@@ -1121,7 +1156,17 @@ def isDPinDomain__(bbox, coords):
     return out, list_ids_outside_box
 
 def _addIBCData__(t, frontIP, donorPts, wallPts, integrationPts, IBM_parameters):
+    
+    elementType = checkElementType(t)
 
+    if elementType == 'NGON':
+        indicesF = []
+        zf = P.exteriorFaces(t, indices=indicesF)
+        indicesF = indicesF[0]
+        print(indicesF)
+    C.convertPyTree2File(t, 'check_t.cgns')
+    exit()
+    
     if IBM_parameters["spatial discretization"]["type"]=="FV":
         N_IP_per_face = 1
     else:
@@ -1151,7 +1196,7 @@ def _addIBCData__(t, frontIP, donorPts, wallPts, integrationPts, IBM_parameters)
                     Internal.newDataArray('CoordinateZ', value=coords_IBC_z, parent=gc)
                     ids = C.identifyNodes(hook, zibc, tol=__TOL__)
                     ids = ids[ids[:] > -1] - 1
-                    ids = ids.tolist()
+                    ids = ids.tolist()                       
                     zoneIBC = T.subzone(frontIP, ids, type='elements')
                     zoneIBC[0] = "IBMWall%d"%nobc
                     C._addBC2Zone(z, "IBMWall%d"%nobc, "FamilySpecified:IBMWall", subzone=zoneIBC)
@@ -1160,34 +1205,34 @@ def _addIBCData__(t, frontIP, donorPts, wallPts, integrationPts, IBM_parameters)
                         if "IBMWall%d"%nobc in Internal.getName(bc):
                             Internal.createUniqueChild(bc, 'GridLocation', 'GridLocation_t', value='FaceCenter')
                             Internal.setName(bc, "IBMWall%d"%nobc)
-        #C.freeHook(hook)
-        for bc in Internal.getNodesFromType2(z, 'BC_t'):
-            famName = Internal.getNodeFromName(bc, 'FamilyName')
-            if famName is not None:
-                if Internal.getValue(famName) == 'IBMWall':
-                    namebc = bc[0] # add the split.
-                    ibcdataset = Internal.createNode('BCDataSet','BCDataSet_t', parent=bc,value='Null')
-                    for i in range(N_IP_per_face):
-                        dnrPts = Internal.createNode("DonorPointCoordinates"+str(list_suffix_datasets[i]), 'BCData_t', parent=ibcdataset)
-                        wallPtsTmp = Internal.createNode("WallPointCoordinates"+str(list_suffix_datasets[i]), 'BCData_t', parent=ibcdataset)
-
-                        coordsPD = Converter.extractVars(donorPts[namebc], ['CoordinateX', 'CoordinateY', 'CoordinateZ'])
-                        coordsPW = Converter.extractVars(wallPts[namebc], ['CoordinateX', 'CoordinateY', 'CoordinateZ'])
-
-                        Internal.newDataArray('CoordinateX', value=coordsPD[0][1][0,:][i::N_IP_per_face], parent=dnrPts)
-                        Internal.newDataArray('CoordinateY', value=coordsPD[0][1][1,:][i::N_IP_per_face], parent=dnrPts)
-                        Internal.newDataArray('CoordinateZ', value=coordsPD[0][1][2,:][i::N_IP_per_face], parent=dnrPts)
-
-                        Internal.newDataArray('CoordinateX', value=coordsPW[0][1][0,:][i::N_IP_per_face], parent=wallPtsTmp)
-                        Internal.newDataArray('CoordinateY', value=coordsPW[0][1][1,:][i::N_IP_per_face], parent=wallPtsTmp)
-                        Internal.newDataArray('CoordinateZ', value=coordsPW[0][1][2,:][i::N_IP_per_face], parent=wallPtsTmp)
-
-                        if IBM_parameters["spatial discretization"]["type"] in ["DG", "DGSEM"]:
-                            coordsPI = Converter.extractVars(integrationPts[bc[0]], ['CoordinateX','CoordinateY','CoordinateZ'])
-                            integrationPtsTmp = Internal.createNode("IntegrationPointCoordinates"+str(list_suffix_datasets[i]),'BCData_t', parent=ibcdataset)
-                            Internal.newDataArray('CoordinateX', value=coordsPI[0][1][0,:][i::N_IP_per_face], parent=integrationPtsTmp)
-                            Internal.newDataArray('CoordinateY', value=coordsPI[0][1][1,:][i::N_IP_per_face], parent=integrationPtsTmp)
-                            Internal.newDataArray('CoordinateZ', value=coordsPI[0][1][2,:][i::N_IP_per_face], parent=integrationPtsTmp)
+        ##C.freeHook(hook)
+        #for bc in Internal.getNodesFromType2(z, 'BC_t'):
+        #    famName = Internal.getNodeFromName(bc, 'FamilyName')
+        #    if famName is not None:
+        #        if Internal.getValue(famName) == 'IBMWall':
+        #            namebc = bc[0] # add the split.
+        #            ibcdataset = Internal.createNode('BCDataSet','BCDataSet_t', parent=bc,value='Null')
+        #            for i in range(N_IP_per_face):
+        #                dnrPts = Internal.createNode("DonorPointCoordinates"+str(list_suffix_datasets[i]), 'BCData_t', parent=ibcdataset)
+        #                wallPtsTmp = Internal.createNode("WallPointCoordinates"+str(list_suffix_datasets[i]), 'BCData_t', parent=ibcdataset)
+        #
+        #                coordsPD = Converter.extractVars(donorPts[namebc], ['CoordinateX', 'CoordinateY', 'CoordinateZ'])
+        #                coordsPW = Converter.extractVars(wallPts[namebc], ['CoordinateX', 'CoordinateY', 'CoordinateZ'])
+        #
+        #                Internal.newDataArray('CoordinateX', value=coordsPD[0][1][0,:][i::N_IP_per_face], parent=dnrPts)
+        #                Internal.newDataArray('CoordinateY', value=coordsPD[0][1][1,:][i::N_IP_per_face], parent=dnrPts)
+        #                Internal.newDataArray('CoordinateZ', value=coordsPD[0][1][2,:][i::N_IP_per_face], parent=dnrPts)
+        #
+        #                Internal.newDataArray('CoordinateX', value=coordsPW[0][1][0,:][i::N_IP_per_face], parent=wallPtsTmp)
+        #                Internal.newDataArray('CoordinateY', value=coordsPW[0][1][1,:][i::N_IP_per_face], parent=wallPtsTmp)
+        #                Internal.newDataArray('CoordinateZ', value=coordsPW[0][1][2,:][i::N_IP_per_face], parent=wallPtsTmp)
+        #
+        #                if IBM_parameters["spatial discretization"]["type"] in ["DG", "DGSEM"]:
+        #                    coordsPI = Converter.extractVars(integrationPts[bc[0]], ['CoordinateX','CoordinateY','CoordinateZ'])
+        #                    integrationPtsTmp = Internal.createNode("IntegrationPointCoordinates"+str(list_suffix_datasets[i]),'BCData_t', parent=ibcdataset)
+        #                    Internal.newDataArray('CoordinateX', value=coordsPI[0][1][0,:][i::N_IP_per_face], parent=integrationPtsTmp)
+        #                    Internal.newDataArray('CoordinateY', value=coordsPI[0][1][1,:][i::N_IP_per_face], parent=integrationPtsTmp)
+        #                    Internal.newDataArray('CoordinateZ', value=coordsPI[0][1][2,:][i::N_IP_per_face], parent=integrationPtsTmp)
 
     return None
 
