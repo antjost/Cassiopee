@@ -864,8 +864,7 @@ def _setIBCData(t, t_exteriorFaces, indicesF, tb, zibc, frontDP, bbo, IBM_parame
         Cmpi.trace(" Adding IBCDatasets [start]", master=False, cpu=False)
         _addIBCData__(t, t_exteriorFaces, indicesF, donorPts, wallPts, integrationPts, IBM_parameters)
         Cmpi.trace(" Adding IBCDatasets [end]  ", master=False, cpu=False)
-        C.convertPyTree2File(t, 'check_t_%s.cgns'%elementType)
-        exit()
+
     C._rmVars(t, ['cellNFront'])
 
     if different_front_flag == False: #True is default
