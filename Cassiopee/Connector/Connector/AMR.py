@@ -107,7 +107,7 @@ def prepareAMRDataFV__(t_case, t, IBM_parameters=None, check=False, dim=3, local
     #===============================================================================================================================
     # only done for frontTypeIP=2 - if frontTypeIP=1 it is F1 so blankByIBCBodies is sufficient for the cellN value
     Cmpi.trace("Extract front faces of IBM integration points [start] ", master=True, cpu=False)
-    frontIP, maxDistIP = getFrontIP(t, IBM_parameters, localDir, check=check, VPM=VPM)
+    frontIP, maxDistIP = getFrontIP(t, IBM_parameters, localDir, check=check, VPM=VPM, dim=dim)
     Cmpi.trace("Extract front faces of IBM integration points [end]   ", master=True, cpu=False)
 
     #====================================================
@@ -118,7 +118,7 @@ def prepareAMRDataFV__(t_case, t, IBM_parameters=None, check=False, dim=3, local
     Cmpi.trace(" Removing blanked cells [end]  ", master=True, cpu=False)
 
     #===============================
-    # STEP 5: Recover BCs - Add IBCs
+    # STEP 5: Recover BCs - Getting IBCs
     #===============================
     Cmpi.trace(" Recovering Boundary Conditions [start]", master=True, cpu=False)
     t, zibc, t_exteriorFaces, indicesF = recoverBCs(t, frontIP, BCInfo)
@@ -357,25 +357,8 @@ def removeBlankedCells(t):
 
 # ===============================================================================================================================
 def getBCs(t, tb2, dim):
-    if not isCasFunction:
-        # Identity the BCTypes & BCNames in t
-        zbcs=[]; bctypes=[]; bcnames=[]
-        for bc in Internal.getNodesFromType(t, 'BC_t'):
-            bctype = Internal.getValue(bc)
-            bcname = Internal.getName(bc)
-            if bctype not in bctypes:
-                bctypes.append(bctype)
-                bcnames.append(bcname)
-
-        # Save the boundary conditions for later use
-        for bctype in bctypes:
-            zbc = C.extractBCOfType(t, bctype)
-            Internal._rmNodesByType(zbc, "FlowSolution_t")
-            zbc = T.join(zbc)
-            zbcs.append(zbc)
-    else:
-        (zbcs, bcnames, bctypes) = C.getBCs(t)
-        for zbc in zbcs: Internal._rmNodesByType(zbc, "FlowSolution_t")
+    (zbcs, bcnames, bctypes) = C.getBCs(t)
+    for zbc in zbcs: Internal._rmNodesByType(zbc, "FlowSolution_t")
 
     # Blanking to check if the QuadNQuad BC is inside the geometry
     # Needed to avoid wrong BCs
@@ -580,9 +563,8 @@ def getBodiesDist2wall__(tb):
     return tb_WD
 
 # ===============================================================================================================================
-def getFrontIP(t, IBM_parameters, localDir, check=False, VPM=False):
-    frontIP = extractFrontIP__(t, IBM_parameters, VPM=VPM)
-
+def getFrontIP(t, IBM_parameters, localDir, check=False, VPM=False, dim=3):
+    frontIP = extractFrontIP__(t, IBM_parameters, VPM=VPM, dim=dim)
     maxDistIP = 0.0
     turbDistanceTmp = Internal.getNodeFromName(frontIP, 'TurbulentDistance')[1]
     if len(turbDistanceTmp)>0: maxDistIP = C.getMaxValue(frontIP, 'TurbulentDistance')
@@ -593,7 +575,7 @@ def getFrontIP(t, IBM_parameters, localDir, check=False, VPM=False):
 
     return frontIP, maxDistIP
 
-def extractFrontIP__(t, IBM_parameters, VPM=False):
+def extractFrontIP__(t, IBM_parameters, VPM=False, dim=3):
     if VPM == False:
         frontTypeIP = IBM_parameters["integration points"]["front type"]
         print("Rank: %d :: frontTypeIP=%d"%(Cmpi.rank, int(frontTypeIP)), flush=True)
@@ -613,6 +595,16 @@ def extractFrontIP__(t, IBM_parameters, VPM=False):
         tTmpBreak = T.breakElements(t)
         frontIP = P.frontFaces(tTmpBreak, 'cellN')
         del tTmpBreak
+
+        ##work around for variable snear -> breakElements does not work when I have a conformized
+        ##                                  NGON --> segFault
+        #G._getVolumeMap(frontIP)
+        #hminTmp = (C.getMinValue(frontIP,"centers:vol"))**(0.5)
+        #if dim==2: hminTmp = (C.getMinValue(frontIP,"centers:vol"))
+        #hminTmp = Cmpi.allreduce(hminTmp, op=Cmpi.MIN)
+        #C._rmVars(frontIP,['centers:vol'])
+        #frontIP = G.close(frontIP, hminTmp*1.01)
+        #del hminTmp
     else:
         frontIP = P.frontFaces(t, 'cellN')
     return frontIP
@@ -1213,7 +1205,7 @@ def _addIBCData__(t, t_exteriorFaces, indicesF, donorPts, wallPts, integrationPt
                         zoneIBC[0] = "IBMWall%d"%nobc
                         C._addBC2Zone(z, "IBMWall%d"%nobc, "FamilySpecified:IBMWall", subzone=zoneIBC)
                     else:
-                        indicesF = indicesF[0]
+                        if isinstance(indicesF, list): indicesF = indicesF[0]
                         sizebc = ids.size
                         id2 = numpy.empty(sizebc, dtype=Internal.E_NpyInt)
                         id2[:] = indicesF[ids[:]]
