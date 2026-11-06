@@ -203,7 +203,7 @@ def prepareAMRDataDG__(t_case, t, IBM_parameters=None, check=False, dim=3, local
     #===============================================================================================================================
     # only done for frontTypeIP=2 - if frontTypeIP=1 it is F1 so blankByIBCBodies is sufficient for the cellN value
     Cmpi.trace("Extract front faces of IBM integration points [start] ", master=True, cpu=False)
-    frontIP, maxDistIP = getFrontIP(t, IBM_parameters, localDir, False, VPM=VPM)
+    frontIP, maxDistIP = getFrontIP(t, IBM_parameters, localDir, check=check, VPM=VPM)
     Cmpi.trace("Extract front faces of IBM integration points [end]   ", master=True, cpu=False)
 
     #====================================================
@@ -1347,15 +1347,15 @@ def checkDPtoIPDistance__(integrationPts, donorPts):
 # ===============================================================================================================================
 # DG-related functions
 # ===============================================================================================================================
-def _addIBC2Zone__(t, frontIP, zibc):
+def _addIBC2Zone__(t, t_exteriorFaces, zibc):
     for z in Internal.getZones(t):
-        hook = C.createHook(frontIP, 'elementCenters')
+        hook = C.createHook(t_exteriorFaces, 'elementCenters')
         ids = C.identifyElements(hook, zibc, tol=__TOL__)
         ids = ids[ids[:] > -1]
         ids = ids.tolist()
         ids = [ids[i]-1 for i in range(len(ids))]
         #C.freeHook(hook)
-        zoneIBC = T.subzone(frontIP, ids, type='elements')
+        zoneIBC = T.subzone(t_exteriorFaces, ids, type='elements')
         G_AMR._addBC2Zone(z, "IBMWall", "FamilySpecified:IBMWall", zoneIBC)
     return None
 
